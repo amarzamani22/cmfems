@@ -1707,3 +1707,222 @@ body.login-mode #page-content {
   .cal-weekday { font-size: 9.5px; padding: 6px 3px; }
   .cal-legend { gap: 8px; font-size: 10px; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE (phones & small tablets · ≤720px)
+   Slide-in sidebar, stacked grids, full-screen modals, etc.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Mobile overlay backdrop — hidden by default everywhere */
+.mobile-overlay {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  /* ── Sidebar: fixed slide-in from left ── */
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 85vw;
+    transform: translateX(-100%);
+    z-index: 100;
+    transition: transform 0.25s var(--ease), box-shadow 0.25s var(--ease);
+    box-shadow: none;
+  }
+  body.mobile-menu-open .sidebar {
+    transform: translateX(0);
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.35);
+  }
+  /* On mobile, sidebar is always "wide" when visible — ignore desktop collapsed styling */
+  .sidebar.collapsed .sb-brand-text,
+  .sidebar.collapsed .sb-footer .sb-role-label,
+  .sidebar.collapsed .sb-footer .sb-user-text,
+  .sidebar.collapsed .nav-item span,
+  .sidebar.collapsed .nav-count,
+  .sidebar.collapsed .sb-section-label,
+  .sidebar.collapsed .sb-logout-btn {
+    display: revert;
+  }
+  .sidebar.collapsed .nav-item.active::before { left: -8px; }
+
+  /* ── Mobile overlay: dark backdrop when menu is open ── */
+  .mobile-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  body.mobile-menu-open .mobile-overlay {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* ── Main wrap: full width ── */
+  .main-wrap {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* ── Topbar: tighter padding, hide search ── */
+  .topbar {
+    padding: 0 12px;
+  }
+  .search-wrap {
+    display: none;
+  }
+  .breadcrumb {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40vw;
+  }
+
+  /* ── Page content: reduced padding ── */
+  .page-content {
+    padding: 14px 12px;
+  }
+  .page-hd {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .page-hd-right {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .page-title { font-size: 20px; }
+
+  /* ── Grids: all stack to single column ── */
+  .grid-4,
+  .grid-3,
+  .grid-2,
+  .grid-3-1,
+  .grid-2-1 {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+
+  /* ── Modals: nearly full-screen ── */
+  .modal-box {
+    max-width: none !important;
+    width: calc(100vw - 24px);
+    margin: 16px 12px;
+    max-height: calc(100vh - 32px);
+  }
+  .modal-body {
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+  }
+
+  /* ── Inputs: 16px min to prevent iOS auto-zoom on focus ── */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="tel"],
+  textarea,
+  select,
+  .input {
+    font-size: 16px !important;
+  }
+
+  /* ── Buttons: bigger tap targets ── */
+  .btn {
+    min-height: 38px;
+    padding: 8px 14px;
+  }
+  .btn-sm {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+  .icon-btn {
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  /* ── KPI cards: slightly compacter ── */
+  .kpi-card { padding: 12px; }
+  .kpi-value { font-size: 22px; }
+
+  /* ── Photo grid: 2-col instead of 4 ── */
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* ── Notification panel: full width with small side margin ── */
+  .notif-panel {
+    width: calc(100vw - 24px);
+    max-width: none;
+    right: -4px;
+    left: auto;
+  }
+
+  /* ── Login screen: softer padding on small viewport ── */
+  .login-card {
+    max-width: 100%;
+    padding: 28px 22px;
+  }
+  .login-wrap {
+    padding: 20px 12px;
+  }
+
+  /* ── Tables: ensure horizontal scroll works cleanly ── */
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  table { min-width: 600px; }
+
+  /* ── Attention strip: stack vertically so pills wrap ── */
+  .attention-strip {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* ── Work-queue tabs: wrap to multiple rows on small ── */
+  .wq-tabs { flex-wrap: wrap; }
+  .wq-hd   { flex-direction: column; align-items: stretch; }
+
+  /* ── View toggle (list/calendar): keep inline ── */
+  .view-toggle { flex-shrink: 0; }
+
+  /* ── Section headers: allow wrapping when space is tight ── */
+  .section-hd { flex-wrap: wrap; gap: 8px; }
+
+  /* ── Toolbars: wrap filters ── */
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .toolbar-search { max-width: 100% !important; flex: 1 1 100%; }
+
+  /* ── Close icon on modal: bigger hit area ── */
+  .modal-hd .icon-btn { flex-shrink: 0; }
+}
+
+/* Extra tight adjustments for small phones (≤480px) */
+@media (max-width: 480px) {
+  .page-content { padding: 12px 8px; }
+  .card { padding: 12px; }
+  .kpi-value { font-size: 20px; }
+  .kpi-card { padding: 10px; }
+  .btn { font-size: 12.5px; padding: 8px 12px; }
+  .page-title { font-size: 18px; }
+  .modal-box {
+    width: calc(100vw - 16px);
+    margin: 8px;
+    border-radius: var(--r-md);
+  }
+}
