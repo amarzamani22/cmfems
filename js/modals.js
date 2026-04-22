@@ -2526,7 +2526,11 @@ function updateSidebarUser() {
 function attachGlobals() {
   // Sidebar nav
   document.querySelectorAll('.nav-item[data-page]').forEach(el => {
-    el.addEventListener('click', () => go(el.dataset.page));
+    el.addEventListener('click', () => {
+      go(el.dataset.page);
+      // Auto-close mobile slide-in menu after navigation
+      if (window.innerWidth <= 720) document.body.classList.remove('mobile-menu-open');
+    });
   });
 
   // Sync the sidebar user panel to the logged-in user (no-op if logged out)
@@ -2545,10 +2549,20 @@ function attachGlobals() {
     }
   });
 
-  // Sidebar toggle (collapse)
+  // Sidebar toggle — behaves differently on phone vs desktop
   const menuBtn = document.getElementById('menu-btn');
   if (menuBtn) menuBtn.addEventListener('click', () => {
-    document.getElementById('sidebar').classList.toggle('collapsed');
+    if (window.innerWidth <= 720) {
+      document.body.classList.toggle('mobile-menu-open');
+    } else {
+      document.getElementById('sidebar').classList.toggle('collapsed');
+    }
+  });
+
+  // Mobile overlay: click to close the slide-in menu
+  const overlay = document.getElementById('mobile-overlay');
+  if (overlay) overlay.addEventListener('click', () => {
+    document.body.classList.remove('mobile-menu-open');
   });
 
   // Global search (topbar)
