@@ -1861,12 +1861,15 @@ body.login-mode #page-content {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 
-  /* ── Notification panel: full width with small side margin ── */
+  /* ── Notification panel: anchor to viewport edges, not the bell icon ── */
   .notif-panel {
-    width: calc(100vw - 24px);
+    position: fixed;
+    top: calc(var(--tb-h) + 6px);
+    left: 10px;
+    right: 10px;
+    width: auto;
     max-width: none;
-    right: -4px;
-    left: auto;
+    max-height: calc(100vh - var(--tb-h) - 20px);
   }
 
   /* ── Login screen: softer padding on small viewport ── */
