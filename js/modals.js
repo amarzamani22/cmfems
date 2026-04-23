@@ -172,6 +172,69 @@ function openDeleteFacility(facilityId) {
    PM TEMPLATE MODALS
    ═══════════════════════════════════════════════════════════ */
 
+function openViewTemplate(templateId) {
+  const t = getTemplate(templateId);
+  if (!t) return;
+  const jobsUsing = JOBS.filter(j => j.checklistId === t.id).length;
+
+  document.getElementById('modal-box').style.maxWidth = '560px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">${t.name}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">
+          ${t.entityType === 'facility' ? 'Facility' : 'Equipment'} · ${t.equipmentType || t.facilityType || '—'} · ${t.serviceType}
+          ${t.status === 'inactive' ? ` · <span style="color:var(--text-3);">Inactive</span>` : ''}
+        </div>
+      </div>
+      <button class="icon-btn" id="vt-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:10px 14px;display:flex;flex-direction:column;gap:4px;font-size:12px;">
+        <div class="flex-between"><span class="text-3">Status</span><span>${t.status === 'active' ? pill('Active','ok') : pill('Inactive','neutral')}</span></div>
+        <div class="flex-between"><span class="text-3">Checklist items</span><span style="font-weight:500;">${t.items.length}</span></div>
+        <div class="flex-between"><span class="text-3">Currently in use</span><span>${jobsUsing > 0 ? `${jobsUsing} active job${jobsUsing>1?'s':''}` : '—'}</span></div>
+      </div>
+
+      <div>
+        <div class="ae-section-label" style="margin-bottom:8px;">Checklist items</div>
+        ${t.items.length === 0 ? `
+          <div style="font-size:12px;color:var(--text-3);padding:8px 0;">No items in this template.</div>
+        ` : `
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${t.items.map((item, i) => `
+              <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 10px;background:var(--card-bg);border:0.5px solid var(--border);border-radius:var(--r-md);">
+                <span style="font-size:11px;font-weight:600;color:var(--text-3);padding-top:1px;min-width:20px;">${i+1}.</span>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-size:12.5px;color:var(--text-1);line-height:1.45;">${esc(item.bm)}</div>
+                  ${item.en ? `<div style="font-size:11px;color:var(--text-3);margin-top:2px;line-height:1.4;">${esc(item.en)}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `}
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="vt-close-btn">Close</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary admin-only" id="vt-edit">Edit template</button>
+    </div>
+  `;
+
+  document.getElementById('vt-close').onclick     = closeModal;
+  document.getElementById('vt-close-btn').onclick = closeModal;
+  document.getElementById('vt-edit').onclick = () => {
+    closeModal();
+    document.getElementById('modal-box').style.maxWidth = '';
+    setTimeout(() => openTemplateEditor(templateId), 100);
+  };
+  applyAdminVisibility();
+}
+
 function openTemplateEditor(templateId) {
   const editing = templateId ? getTemplate(templateId) : null;
   S.templateDraft = editing
@@ -2129,6 +2192,56 @@ function saveNewEquipment() {
    ═══════════════════════════════════════════════════════════ */
 
 function attachHandlers() {
+  // Kebab menus: click the ⋮ button toggles dropdown.
+  // The dropdown is moved to <body> when opened so it escapes any overflow container
+  // or transform-based containing block. Restored to its original parent when closed.
+  document.querySelectorAll('[data-kebab-toggle]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const menu = btn.closest('.kebab-menu');
+      const dropdown = menu.querySelector('.kebab-dropdown') || menu._kebabDropdown;
+      const wasOpen = menu.classList.contains('open');
+      closeAllKebabs();
+      if (!wasOpen) {
+        menu.classList.add('open');
+        menu._kebabDropdown = dropdown;
+        // Move dropdown to body so it escapes any transformed/overflow ancestor
+        document.body.appendChild(dropdown);
+        const rect = btn.getBoundingClientRect();
+        const dropdownWidth = 160;
+        // Default: align dropdown's right edge with button's right edge
+        let leftPx = rect.right - dropdownWidth;
+        // If that pushes the left edge off-screen, align with button's left edge instead
+        if (leftPx < 8) leftPx = Math.max(8, rect.left);
+        dropdown.style.position = 'fixed';
+        dropdown.style.left     = leftPx + 'px';
+        dropdown.style.right    = 'auto';
+
+        // Measure dropdown height to decide: drop below (default) or flip above
+        const dropdownHeight = dropdown.offsetHeight;
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        if (spaceBelow < dropdownHeight + 12 && spaceAbove > dropdownHeight + 12) {
+          // Flip upward — appear above the button
+          dropdown.style.top = (rect.top - dropdownHeight - 6) + 'px';
+          dropdown.classList.add('drop-up');
+        } else {
+          // Drop below (default)
+          dropdown.style.top = (rect.bottom + 6) + 'px';
+          dropdown.classList.remove('drop-up');
+        }
+
+        // Required because dropdown is now outside `.kebab-menu.open` in the DOM
+        dropdown.classList.add('is-open');
+      }
+    });
+  });
+
+  // When a kebab action is clicked, close the menu before the action fires
+  document.querySelectorAll('.kebab-item').forEach(item => {
+    item.addEventListener('click', () => closeAllKebabs());
+  });
+
   // Login form submission (only present when logged out)
   const loginForm = document.getElementById('login-form');
   if (loginForm) {
@@ -2230,6 +2343,8 @@ function attachHandlers() {
         openEditPartInCatalog(el.dataset.part);
       } else if (act === 'delete-part-item') {
         openDeletePartFromCatalog(el.dataset.part);
+      } else if (act === 'view-template') {
+        openViewTemplate(el.dataset.template);
       } else if (act === 'add-template') {
         openTemplateEditor(null);
       } else if (act === 'edit-template') {
@@ -2415,6 +2530,32 @@ function attachHandlers() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   KEBAB MENUS — shared close helper (global)
+   ═══════════════════════════════════════════════════════════ */
+
+function closeAllKebabs() {
+  document.querySelectorAll('.kebab-menu.open').forEach(m => {
+    m.classList.remove('open');
+    // Restore dropdown to its original parent if it was portalled to body
+    if (m._kebabDropdown && m._kebabDropdown.parentElement === document.body) {
+      m.appendChild(m._kebabDropdown);
+      m._kebabDropdown.classList.remove('is-open');
+      m._kebabDropdown.classList.remove('drop-up');
+      m._kebabDropdown.style.position = '';
+      m._kebabDropdown.style.top = '';
+      m._kebabDropdown.style.left = '';
+      m._kebabDropdown.style.right = '';
+    }
+  });
+  // Also clean up any orphaned dropdowns in body (edge case after re-renders)
+  document.querySelectorAll('body > .kebab-dropdown.is-open').forEach(d => {
+    d.classList.remove('is-open');
+    d.style.cssText = '';
+    d.remove();
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
    NOTIFICATIONS — toggle + outside-close
    ═══════════════════════════════════════════════════════════ */
 
@@ -2593,6 +2734,17 @@ function attachGlobals() {
     const wrap = document.getElementById('notif-wrap');
     if (wrap && !wrap.contains(e.target)) setNotifications(false);
   });
+
+  // Kebab menus: close on outside click or on any scroll
+  document.addEventListener('click', e => {
+    // If click is inside a kebab menu (⋮ button) or inside a portalled dropdown, don't close here — the kebab handlers do it properly
+    if (e.target.closest('.kebab-menu')) return;
+    if (e.target.closest('.kebab-dropdown')) return;
+    closeAllKebabs();
+  });
+  document.addEventListener('scroll', () => {
+    closeAllKebabs();
+  }, true);
 }
 
 /* ═══════════════════════════════════════════════════════════
