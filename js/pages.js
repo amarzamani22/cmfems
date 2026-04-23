@@ -642,10 +642,20 @@ function renderEquipmentDetail() {
                           <td style="text-align:center;">${ep.qty} ${p.unit}</td>
                           <td>${stockPill}</td>
                           <td class="admin-only" style="text-align:right;">
-                            <div style="display:inline-flex;gap:6px;">
-                              <button class="btn btn-sm admin-only" data-action="edit-equip-part" data-equip="${e.id}" data-part="${p.id}">Edit</button>
-                              <button class="btn btn-sm admin-only" data-action="remove-equip-part" data-equip="${e.id}" data-part="${p.id}"
-                                style="color:var(--danger-text);border-color:var(--danger-border);">Remove</button>
+                            <div class="kebab-menu" data-kebab-id="ep-${e.id}-${p.id}" style="display:inline-flex;">
+                              <button class="kebab-btn" data-kebab-toggle="ep-${e.id}-${p.id}" aria-label="More actions">
+                                <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                              </button>
+                              <div class="kebab-dropdown">
+                                <button class="kebab-item" data-action="edit-equip-part" data-equip="${e.id}" data-part="${p.id}">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                  Edit qty
+                                </button>
+                                <button class="kebab-item kebab-item-danger" data-action="remove-equip-part" data-equip="${e.id}" data-part="${p.id}">
+                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                                  Remove
+                                </button>
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -769,20 +779,42 @@ function renderEquipmentDetail() {
                         <strong>Resolved ${fmtDate(b.resolvedDate)}</strong> by ${b.resolvedBy}
                         ${b.resolutionNotes ? `<div style="margin-top:2px;opacity:0.85;">${b.resolutionNotes}</div>` : ''}
                       </div>
-                      <div style="display:flex;gap:6px;">
-                        <button class="btn btn-sm admin-only" data-action="edit-breakdown" data-bd="${b.id}">Edit</button>
-                        <button class="btn btn-sm admin-only" data-action="delete-breakdown" data-bd="${b.id}"
-                          style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+                      <div class="kebab-menu admin-only" data-kebab-id="bdh-r-${b.id}">
+                        <button class="kebab-btn" data-kebab-toggle="bdh-r-${b.id}" aria-label="More actions">
+                          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                        </button>
+                        <div class="kebab-dropdown">
+                          <button class="kebab-item" data-action="edit-breakdown" data-bd="${b.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            Edit report
+                          </button>
+                          <button class="kebab-item kebab-item-danger" data-action="delete-breakdown" data-bd="${b.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     ` : `
-                      <div style="margin-top:6px;display:flex;gap:6px;">
-                        <button class="btn btn-sm admin-only" data-action="edit-breakdown" data-bd="${b.id}">Edit</button>
-                        <button class="btn btn-sm admin-only" data-action="delete-breakdown" data-bd="${b.id}"
-                          style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+                      <div style="margin-top:6px;display:flex;gap:6px;align-items:center;">
                         <button class="btn btn-sm admin-only" data-action="resolve-breakdown" data-bd="${b.id}"
                           style="background:var(--bd-text);border-color:var(--bd-text);color:white;">
                           Mark resolved
                         </button>
+                        <div class="kebab-menu admin-only" data-kebab-id="bdh-a-${b.id}">
+                          <button class="kebab-btn" data-kebab-toggle="bdh-a-${b.id}" aria-label="More actions">
+                            <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                          </button>
+                          <div class="kebab-dropdown">
+                            <button class="kebab-item" data-action="edit-breakdown" data-bd="${b.id}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                              Edit report
+                            </button>
+                            <button class="kebab-item kebab-item-danger" data-action="delete-breakdown" data-bd="${b.id}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     `}
                   </div>
@@ -1431,15 +1463,27 @@ function renderParts() {
                   <td style="text-align:center;" title="${users.map(u=>u.name).join(', ')}">${users.length} equip.</td>
                   <td>${pill(stockStatus[0], stockStatus[1])}</td>
                   <td class="admin-only">
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
+                    <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
                       <button class="btn btn-sm" data-action="update-stock" data-part="${p.id}">Update stock</button>
                       <a class="btn btn-sm btn-primary" href="https://shopee.com.my/search?keyword=${encodeURIComponent(p.name + ' ' + p.code)}" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;gap:4px;">
                         Order
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                       </a>
-                      <button class="btn btn-sm" data-action="edit-part-item" data-part="${p.id}">Edit</button>
-                      <button class="btn btn-sm" data-action="delete-part-item" data-part="${p.id}"
-                        style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+                      <div class="kebab-menu" data-kebab-id="part-${p.id}">
+                        <button class="kebab-btn" data-kebab-toggle="part-${p.id}" aria-label="More actions">
+                          <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                        </button>
+                        <div class="kebab-dropdown">
+                          <button class="kebab-item" data-action="edit-part-item" data-part="${p.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            Edit part
+                          </button>
+                          <button class="kebab-item kebab-item-danger" data-action="delete-part-item" data-part="${p.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                            Delete part
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1746,20 +1790,38 @@ function renderTemplates() {
                 const inUseJobs = JOBS.filter(j => j.checklistId === t.id).length;
                 return `
                   <tr>
-                    <td style="font-weight:500;">${t.name}${inUseJobs > 0 ? ` <span class="pill pill-info" style="margin-left:6px;">${inUseJobs} active</span>` : ''}</td>
+                    <td style="font-weight:500;">
+                      <a href="#" data-action="view-template" data-template="${t.id}" style="color:var(--accent);text-decoration:none;">${t.name}</a>
+                      ${inUseJobs > 0 ? ` <span class="pill pill-info" style="margin-left:6px;">${inUseJobs} active</span>` : ''}
+                    </td>
                     <td style="color:var(--text-2);">${t.equipmentType}</td>
                     <td style="color:var(--text-2);">${t.serviceType}</td>
                     <td style="text-align:center;">${t.items.length}</td>
                     <td>${t.status === 'active' ? pill('Active','ok') : pill('Inactive','neutral')}</td>
                     <td class="admin-only">
-                      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">
-                        <button class="btn btn-sm" data-action="edit-template" data-template="${t.id}">Edit</button>
-                        <button class="btn btn-sm" data-action="duplicate-template" data-template="${t.id}">Duplicate</button>
+                      <div style="display:flex;gap:6px;align-items:center;justify-content:flex-end;">
                         <button class="btn btn-sm" data-action="toggle-template" data-template="${t.id}">
                           ${t.status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>
-                        <button class="btn btn-sm" data-action="delete-template" data-template="${t.id}"
-                          style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+                        <div class="kebab-menu" data-kebab-id="tpl-${t.id}">
+                          <button class="kebab-btn" data-kebab-toggle="tpl-${t.id}" aria-label="More actions">
+                            <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+                          </button>
+                          <div class="kebab-dropdown">
+                            <button class="kebab-item" data-action="edit-template" data-template="${t.id}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                              Edit template
+                            </button>
+                            <button class="kebab-item" data-action="duplicate-template" data-template="${t.id}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                              Duplicate
+                            </button>
+                            <button class="kebab-item kebab-item-danger" data-action="delete-template" data-template="${t.id}">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                              Delete
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -1843,6 +1905,26 @@ function renderReports() {
   const grandSpend = HISTORY.reduce((s,h) => s+(h.cost||0), 0);
   const avgCost    = totalHist === 0 ? 0 : Math.round(grandSpend / totalHist);
   const mostActive = byAsset[0];
+
+  // Fuel consumption stats
+  const fuelCostOf = f => f.totalCost != null ? f.totalCost : (f.litres || 0) * (f.pricePerLitre || 0);
+  const totalFuelCost  = FUEL_ENTRIES.reduce((s,f) => s + fuelCostOf(f), 0);
+  const totalLitres    = FUEL_ENTRIES.reduce((s,f) => s + (f.litres || 0), 0);
+  const thisMonthFuel  = FUEL_ENTRIES.filter(f => {
+    const d = new Date(f.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  }).reduce((s,f) => s + fuelCostOf(f), 0);
+  const fuelByEquip = EQUIPMENT.map(e => {
+    const entries = FUEL_ENTRIES.filter(f => f.equipId === e.id);
+    return {
+      name:    e.name,
+      code:    e.code,
+      litres:  entries.reduce((s,f) => s + (f.litres || 0), 0),
+      cost:    entries.reduce((s,f) => s + fuelCostOf(f), 0),
+      entries: entries.length,
+    };
+  }).filter(x => x.cost > 0).sort((a,b) => b.cost - a.cost);
+  const maxFuelCost = Math.max(...fuelByEquip.map(x => x.cost), 1);
 
   return `
     <div>
@@ -1989,6 +2071,62 @@ function renderReports() {
           `}
         </div>
       </div>
+
+      <div class="grid-2 mb-16">
+        <div class="card">
+          <div class="section-hd mb-12">
+            <div class="section-hd-title">Fuel consumption</div>
+            <span class="fs-11 text-3">${FUEL_ENTRIES.length} refuels logged</span>
+          </div>
+          ${FUEL_ENTRIES.length === 0 ? `
+            <div style="text-align:center;padding:40px 20px;font-size:12px;color:var(--text-3);">No fuel entries recorded yet.</div>
+          ` : `
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+              <div style="background:var(--info-bg);border-radius:var(--r-md);padding:10px 12px;">
+                <div style="font-size:11px;color:var(--info-text);font-weight:500;">Total fuel spend</div>
+                <div style="font-size:22px;font-weight:700;color:var(--info-text);">${fmtRM(Math.round(totalFuelCost))}</div>
+              </div>
+              <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:10px 12px;">
+                <div style="font-size:11px;color:var(--text-3);font-weight:500;">Total litres used</div>
+                <div style="font-size:22px;font-weight:700;color:var(--text-1);">${totalLitres.toLocaleString()} L</div>
+              </div>
+            </div>
+            <div style="font-size:12px;display:flex;flex-direction:column;gap:6px;">
+              <div class="flex-between"><span class="text-3">${now.toLocaleString('en-US',{month:'long'})} fuel spend</span><span style="font-weight:500;">${fmtRM(Math.round(thisMonthFuel))}</span></div>
+              <div class="flex-between"><span class="text-3">Avg cost / litre</span><span style="font-weight:500;">${totalLitres > 0 ? 'RM ' + (totalFuelCost / totalLitres).toFixed(2) : '—'}</span></div>
+              <div class="flex-between"><span class="text-3">Combined operating cost</span><span style="font-weight:500;color:var(--accent);">${fmtRM(Math.round(grandSpend + totalFuelCost))}</span></div>
+            </div>
+            <div style="font-size:10.5px;color:var(--text-4);margin-top:10px;padding-top:8px;border-top:0.5px dashed var(--border);">
+              Combined = maintenance spend + fuel cost
+            </div>
+          `}
+        </div>
+
+        <div class="card">
+          <div class="section-hd mb-12">
+            <div class="section-hd-title">Top fuel users</div>
+            <span class="fs-11 text-3">all time</span>
+          </div>
+          ${fuelByEquip.length === 0 ? `
+            <div style="text-align:center;padding:40px 20px;font-size:12px;color:var(--text-3);">No fuel entries to analyse.</div>
+          ` : `
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${fuelByEquip.slice(0,6).map(e => `
+                <div>
+                  <div class="flex-between mb-4">
+                    <span style="font-size:12px;">${e.name}</span>
+                    <span style="font-size:12px;font-weight:500;">${fmtRM(Math.round(e.cost))} · ${e.litres.toLocaleString()}L</span>
+                  </div>
+                  <div class="progress" style="height:5px;">
+                    <div class="progress-fill" style="width:${Math.round(e.cost/maxFuelCost*100)}%;background:var(--info-text);"></div>
+                  </div>
+                </div>
+              `).join('')}
+              ${fuelByEquip.length > 6 ? `<div style="font-size:11px;color:var(--text-3);text-align:center;padding-top:4px;">+${fuelByEquip.length - 6} more equipment</div>` : ''}
+            </div>
+          `}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -2020,14 +2158,26 @@ function renderBreakdownCard(b) {
       <div style="font-size:12px;color:var(--bd-text);line-height:1.5;margin-bottom:8px;">${b.description}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-3);">
         <span>Reported by <strong style="color:var(--text-2)">${b.reportedBy}</strong> · ${fmtDate(b.date)} at ${b.time}</span>
-        <div style="display:flex;gap:6px;" onclick="event.stopPropagation()">
-          <button class="btn btn-sm admin-only" data-action="edit-breakdown" data-bd="${b.id}">Edit</button>
-          <button class="btn btn-sm admin-only" data-action="delete-breakdown" data-bd="${b.id}"
-            style="color:var(--danger-text);border-color:var(--danger-border);">Delete</button>
+        <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
           <button class="btn btn-sm admin-only" data-action="resolve-breakdown" data-bd="${b.id}"
             style="background:var(--bd-text);border-color:var(--bd-text);color:white;">
             Mark resolved
           </button>
+          <div class="kebab-menu admin-only" data-kebab-id="bdcard-${b.id}">
+            <button class="kebab-btn" data-kebab-toggle="bdcard-${b.id}" aria-label="More actions">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+            </button>
+            <div class="kebab-dropdown">
+              <button class="kebab-item" data-action="edit-breakdown" data-bd="${b.id}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                Edit report
+              </button>
+              <button class="kebab-item kebab-item-danger" data-action="delete-breakdown" data-bd="${b.id}">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
