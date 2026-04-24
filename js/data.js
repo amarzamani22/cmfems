@@ -20,18 +20,6 @@ const EQUIPMENT = [
   { id:'ssl-001',name:'Skid Steer Loader',  code:'SSL-001', type:'Skid Steer',  location:'HQ',             make:'TCM',     model:'FD45T3',    fuel:'Diesel', capacity:'4.5 ton', engine:'Nissan TD27',   purchase:'2018-09-30', hours:5102, status:'warning',  img:null },
 ];
 
-const FUEL_LOGS = {
-  'fl-001':  [1200,1350,1180,1420,1290,1310],
-  'fl-002':  [980, 1100,1050,1080,990, 1020],
-  'fl-003':  [1500,1620,1490,1700,1580,1550],
-  'fl-004':  [820, 890, 840, 910, 870, 850],
-  'fl-005':  [640, 710, 680, 730, 695, 720],
-  'fl-006':  [1100,1180,1090,1250,1200,1160],
-  'mag-001': [1850,2100,1950,2250,2000,2083],
-  'mag-002': [1600,1750,1680,1820,1700,1730],
-  'ssl-001': [900, 980, 920, 1050,990, 1010],
-};
-
 const FUEL_ENTRIES = [
   { id:'fe-001', equipId:'fl-001',  equipCode:'FL-001',  equipName:'Forklift 1',        date:'2026-04-15', litres:220, operatingHours:4510, pricePerLitre:2.85, totalCost:627,  refuelledBy:'Ahmad B.',  notes:'' },
   { id:'fe-002', equipId:'fl-001',  equipCode:'FL-001',  equipName:'Forklift 1',        date:'2026-03-20', litres:195, operatingHours:4380, pricePerLitre:2.80, totalCost:546,  refuelledBy:'Ahmad B.',  notes:'' },
@@ -405,13 +393,14 @@ function activeTemplatesFor(equipType, serviceType, entityType = 'equipment', fa
 
 // User accounts — credentials will move to PHP/DB on backend integration
 const USERS = [
-  { id:'u-admin', name:'Amar Zamani', email:'admin@carmedic.com.my', password:'admin123', role:'admin', avatar:'AZ' },
-  { id:'u-ops',   name:'Ahmad B.',    email:'ops@carmedic.com.my',   password:'ops123',   role:'ops',   avatar:'AB' },
+  { id:'u-admin', name:'Amar Zamani', email:'admin@carmedic.com.my', password:'admin123', role:'admin', avatar:'AZ', active:true },
+  { id:'u-ops',   name:'Ahmad B.',    email:'ops@carmedic.com.my',   password:'ops123',   role:'ops',   avatar:'AB', active:true },
 ];
 
 function authenticate(email, password) {
   const u = USERS.find(x => x.email.toLowerCase() === (email || '').trim().toLowerCase());
   if (!u || u.password !== password) return null;
+  if (u.active === false) return null; // inactive accounts can't log in
   return u;
 }
 
@@ -432,8 +421,12 @@ const S = {
   equipFilters: { location: 'all', type: 'all', status: 'all' },
   maintFilter: 'all',
   histSearch: '',
+  historyTab: 'maintenance',      // 'maintenance' | 'breakdowns' | 'fuel'
+  historyPeriod: '3m',            // 'all' | '1w' | '1m' | '3m' | '1y'
+  historyAssetFilter: 'all',      // 'all' | 'equipment' | 'facility' (maintenance tab only)
   partsSearch: '',
   partsFilter: 'all',
+  partsEquipFilter: 'all',     // filter parts by which equipment they're linked to
   addEquipStep: 1,
   addEquipData: {},
   maintView: 'list',
@@ -452,10 +445,16 @@ const S = {
   facilityFilterType: 'all',
   overviewTab: 'upcoming',
   notifOpen: false,
+  userSearch: '',
+  userFilterRole: 'all',
+  userFilterStatus: 'all',
+  _userDraft: null,
+  _facilityDraft: null,
 };
 
 function freshScheduleForm() {
   return {
+    editJobId: null,
     entityType: 'equipment',
     equipId: '',
     facilityId: '',
