@@ -859,7 +859,7 @@ function renderEquipmentDetail() {
               <div class="section-hd-title">Parts used · this equipment</div>
               <button class="btn btn-sm admin-only" data-action="add-equip-part" data-equip="${e.id}">+ Add part</button>
             </div>
-            ${equip_parts.length === 0 ? `<div style="font-size:12px;color:var(--text-3);">No parts on record. Click "+ Add part" to register parts used by this equipment.</div>` : `
+            ${equip_parts.length === 0 ? `<div style="font-size:12px;color:var(--text-3);">${S.role === 'admin' ? 'No parts on record. Click "+ Add part" to register parts used by this equipment.' : 'No parts on record — ask an administrator to register parts for this equipment.'}</div>` : `
               <div class="table-wrap" style="border-radius:var(--r-md);">
                 <table>
                   <thead>
@@ -1171,7 +1171,21 @@ function renderJob() {
           </div>
           <div class="page-sub">${j.location} · started ${j.started ? fmtDate(j.started) : 'not started'}</div>
         </div>
-        <div class="page-hd-right" style="display:flex;gap:6px;">
+        <div class="page-hd-right" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          ${j.status === 'inprogress' ? `
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--info-bg);color:var(--info-text);border-radius:var(--r-md);font-size:12px;font-weight:600;">
+              <span style="width:7px;height:7px;border-radius:50%;background:var(--info-text);"></span>
+              In progress${j.started ? ` · started ${fmtDate(j.started)}` : ''}
+            </div>
+            <button class="btn btn-sm" data-action="revert-job" data-job="${j.id}" title="Revert to upcoming" style="font-size:11px;color:var(--text-3);">
+              Revert
+            </button>
+          ` : `
+            <button class="btn" data-action="start-job" data-job="${j.id}" style="background:var(--info-bg);color:var(--info-text);border-color:var(--info-text);font-weight:600;">
+              <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              Start job
+            </button>
+          `}
           <button class="btn admin-only" data-action="edit-job" data-job="${j.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
             Edit
@@ -1223,7 +1237,7 @@ function renderJob() {
             ${items.length === 0 ? `
               <div class="alert-banner alert-warning" style="font-size:12px;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                <div>No checklist template attached to this job. Technician will need to use a custom checklist, or <a href="#" data-nav="maintenance" style="color:inherit;font-weight:600;">re-schedule with a template →</a></div>
+                <div>No checklist template attached to this job.${S.role === 'admin' ? ` Technician will need to use a custom checklist, or <a href="#" data-nav="maintenance" style="color:inherit;font-weight:600;">re-schedule with a template →</a>` : ' Please proceed using a manual inspection — notify an administrator if a checklist template is needed.'}</div>
               </div>
             ` : items.map(i => `
               <div class="cl-item ${S.checks[i.id] ? 'done' : ''}" data-check="${i.id}">
@@ -1608,7 +1622,7 @@ function renderHistory() {
           <div class="page-sub">All maintenance, breakdown, and fuel records · ${periodLabel}</div>
         </div>
         <div class="page-hd-right">
-          <button class="btn" data-action="export-history-csv">
+          <button class="btn admin-only" data-action="export-history-csv">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
             Export CSV
           </button>
