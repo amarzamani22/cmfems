@@ -2938,6 +2938,10 @@ function attachHandlers() {
         saveScheduleFromForm();
       } else if (act === 'complete-job') {
         openCloseJob(el.dataset.job || S.selectedJob);
+      } else if (act === 'start-job') {
+        startJob(el.dataset.job || S.selectedJob);
+      } else if (act === 'revert-job') {
+        revertJob(el.dataset.job || S.selectedJob);
       } else if (act === 'edit-job') {
         openEditJob(el.dataset.job || S.selectedJob);
       } else if (act === 'delete-job') {
@@ -3321,6 +3325,37 @@ async function saveScheduleFromForm() {
 /* ═══════════════════════════════════════════════════════════
    EDIT / DELETE JOB (admin)
    ═══════════════════════════════════════════════════════════ */
+
+/* startJob — mark a job as "in progress" + record today as the started date.
+   Usable by both admin and operator (signals "someone is working on this").
+   Uses dedicated action endpoint so operators don't hit the admin-only updateJob path. */
+async function startJob(jobId) {
+  const j = JOBS.find(x => x.id === jobId);
+  if (!j) return;
+  if (j.status === 'inprogress') { toast('Job is already in progress', 'info'); return; }
+  try {
+    await API.startJob(jobId);
+    await refreshJobs();
+    toast(`Started · ${j.equipName} · ${j.type}`, 'success');
+    render();
+  } catch (err) {
+    toast(err.message || 'Failed to start job', 'error');
+  }
+}
+
+/* revertJob — flip an in-progress job back to upcoming (for accidental clicks). */
+async function revertJob(jobId) {
+  const j = JOBS.find(x => x.id === jobId);
+  if (!j) return;
+  try {
+    await API.revertJob(jobId);
+    await refreshJobs();
+    toast(`Reverted · ${j.equipName} · now upcoming`, 'info');
+    render();
+  } catch (err) {
+    toast(err.message || 'Failed to revert', 'error');
+  }
+}
 
 function openEditJob(jobId) {
   const j = JOBS.find(x => x.id === jobId);
