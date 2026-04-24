@@ -323,6 +323,22 @@ const API = (() => {
     JOBS.splice(i, 1); persist();
     return delay({ ok: true });
   }
+  async function startJob(id) {
+    const j = JOBS.find(x => x.id === id);
+    if (!j) throw new Error('Job not found');
+    j.status  = 'inprogress';
+    j.started = new Date().toISOString().slice(0, 10);
+    persist();
+    return delay({ ok: true });
+  }
+  async function revertJob(id) {
+    const j = JOBS.find(x => x.id === id);
+    if (!j) throw new Error('Job not found');
+    j.status  = 'upcoming';
+    j.started = null;
+    persist();
+    return delay({ ok: true });
+  }
   async function closeJob(id, data) {
     const jIdx = JOBS.findIndex(j => j.id === id);
     if (jIdx < 0) throw new Error('Job not found');
@@ -498,7 +514,7 @@ const API = (() => {
     listEquipment, createEquipment, updateEquipment, deleteEquipment,
     addEquipmentPart, updateEquipmentPart, removeEquipmentPart,
     listTemplates, createTemplate, updateTemplate, deleteTemplate,
-    listJobs, createJob, updateJob, deleteJob, closeJob,
+    listJobs, createJob, updateJob, deleteJob, startJob, revertJob, closeJob,
     listHistory, deleteHistory,
     listBreakdowns, createBreakdown, updateBreakdown, deleteBreakdown, resolveBreakdown,
     listFuelEntries, createFuelEntry, updateFuelEntry, deleteFuelEntry,
