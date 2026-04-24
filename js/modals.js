@@ -12,15 +12,305 @@
    FACILITY MODALS
    ═══════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════
+   USER ADMINISTRATION MODALS
+   ═══════════════════════════════════════════════════════════ */
+
+function openUserEditor(userId) {
+  const editing = userId ? USERS.find(u => u.id === userId) : null;
+  S._userDraft = editing
+    ? { ...editing }
+    : { id:null, name:'', email:'', password:'', role:'ops', avatar:'', active:true, showPassword:false };
+
+  document.getElementById('modal-box').style.maxWidth = '480px';
+  openModal('');
+  renderUserEditorModal(editing);
+}
+
+function renderUserEditorModal(editing) {
+  const d = S._userDraft;
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">${editing ? 'Edit User' : 'Add New User'}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${editing ? 'Update account details' : 'Create a new admin or operator account'}</div>
+      </div>
+      <button class="icon-btn" id="ue-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div class="field">
+        <label class="field-label">Full name <span class="req">*</span></label>
+        <input class="input" id="ue-name" value="${esc(d.name)}" placeholder="e.g. Ahmad Bin Ismail" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label">Email <span class="req">*</span></label>
+        <input class="input" type="email" id="ue-email" value="${esc(d.email)}" placeholder="user@carmedic.com.my" autocomplete="off">
+      </div>
+      <div class="field">
+        <label class="field-label">
+          ${editing ? 'New password' : 'Password'}
+          ${editing ? `<span style="font-weight:400;color:var(--text-4)">(leave blank to keep current)</span>` : `<span class="req">*</span>`}
+        </label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input class="input" type="${d.showPassword?'text':'password'}" id="ue-password" value="${esc(d.password)}" placeholder="${editing?'••••••••':'At least 6 characters'}" autocomplete="new-password" style="flex:1;">
+          <button class="btn btn-sm" id="ue-toggle-pw" type="button">${d.showPassword?'Hide':'Show'}</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label class="field-label">Role <span class="req">*</span></label>
+          <select class="input" id="ue-role">
+            <option value="ops"   ${d.role==='ops'?'selected':''}>Operator</option>
+            <option value="admin" ${d.role==='admin'?'selected':''}>Admin</option>
+          </select>
+          <div class="field-hint">${d.role==='admin'?'Full access · can manage users, equipment, parts':'Read-only · cannot edit or delete records'}</div>
+        </div>
+        <div class="field">
+          <label class="field-label">Avatar initials</label>
+          <input class="input" id="ue-avatar" maxlength="3" value="${esc(d.avatar)}" placeholder="Auto" style="text-transform:uppercase;">
+          <div class="field-hint">2–3 characters · auto-generated from name if blank</div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Status</label>
+        <div class="view-toggle">
+          <button type="button" class="${d.active?'active':''}" id="ue-status-active">Active</button>
+          <button type="button" class="${!d.active?'active':''}" id="ue-status-inactive">Inactive</button>
+        </div>
+        <div class="field-hint">Inactive accounts cannot log in but their history is preserved.</div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="ue-cancel">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="ue-save">${editing ? 'Save changes' : 'Create user'}</button>
+    </div>
+  `;
+
+  const closeHandler = () => { S._userDraft = null; closeModal(); document.getElementById('modal-box').style.maxWidth = ''; };
+  document.getElementById('ue-close').onclick  = closeHandler;
+  document.getElementById('ue-cancel').onclick = closeHandler;
+
+  // Sync text fields back to draft
+  const sync = (id, key) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => { d[key] = el.value; });
+  };
+  sync('ue-name', 'name');
+  sync('ue-email', 'email');
+  sync('ue-password', 'password');
+  document.getElementById('ue-avatar').addEventListener('input', e => { d.avatar = e.target.value.toUpperCase(); });
+  document.getElementById('ue-role').addEventListener('change', e => {
+    d.role = e.target.value;
+    renderUserEditorModal(editing);
+  });
+
+  // Password show/hide toggle
+  document.getElementById('ue-toggle-pw').onclick = () => {
+    d.showPassword = !d.showPassword;
+    renderUserEditorModal(editing);
+  };
+
+  // Status toggle
+  document.getElementById('ue-status-active').onclick   = () => { d.active = true;  document.getElementById('ue-status-active').classList.add('active'); document.getElementById('ue-status-inactive').classList.remove('active'); };
+  document.getElementById('ue-status-inactive').onclick = () => { d.active = false; document.getElementById('ue-status-inactive').classList.add('active'); document.getElementById('ue-status-active').classList.remove('active'); };
+
+  document.getElementById('ue-save').onclick = async () => {
+    const name = d.name.trim();
+    const email = d.email.trim().toLowerCase();
+    const password = d.password;
+    const role = d.role;
+    let avatar = (d.avatar || '').trim().toUpperCase();
+
+    if (!name)  { document.getElementById('ue-name').focus();  toast('Full name required', 'error'); return; }
+    if (!email) { document.getElementById('ue-email').focus(); toast('Email required', 'error'); return; }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { document.getElementById('ue-email').focus(); toast('Enter a valid email', 'error'); return; }
+    if (!editing && (!password || password.length < 6)) {
+      document.getElementById('ue-password').focus();
+      toast('Password must be at least 6 characters', 'error');
+      return;
+    }
+    if (password && password.length > 0 && password.length < 6) {
+      document.getElementById('ue-password').focus();
+      toast('Password must be at least 6 characters', 'error');
+      return;
+    }
+    // Auto-generate avatar from name if blank
+    if (!avatar) {
+      const parts = name.split(/\s+/).filter(Boolean);
+      avatar = (parts.length >= 2)
+        ? (parts[0][0] + parts[1][0]).toUpperCase()
+        : name.slice(0, 2).toUpperCase();
+    }
+
+    const saveBtn = document.getElementById('ue-save');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+
+    try {
+      if (editing) {
+        const payload = { name, email, role, avatar, active: d.active };
+        if (password) payload.password = password;
+        await API.updateUser(editing.id, payload);
+        // Refresh session if editing self (server already updated it; re-fetch to mirror)
+        if (S.user && S.user.id === editing.id) {
+          const { user } = await API.me();
+          if (user) { S.user = user; S.role = user.role; }
+        }
+        toast('User updated');
+      } else {
+        await API.createUser({ name, email, password, role, avatar, active: d.active });
+        toast(`${name} added as ${role === 'admin' ? 'Admin' : 'Operator'}`);
+      }
+      await refreshUsers();
+      S._userDraft = null;
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      updateSidebarUser();
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = editing ? 'Save changes' : 'Create user'; }
+    }
+  };
+}
+
+async function toggleUserActive(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  if (S.user && S.user.id === u.id) { toast('You cannot deactivate yourself', 'error'); return; }
+  const newActive = !(u.active !== false);
+  try {
+    await API.updateUser(u.id, { active: newActive });
+    await refreshUsers();
+    toast(`${u.name} · ${newActive ? 'activated' : 'deactivated'}`);
+    render();
+  } catch (err) {
+    toast(err.message || 'Failed to update user', 'error');
+  }
+}
+
+function openResetUserPassword(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+
+  document.getElementById('modal-box').style.maxWidth = '440px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">Reset Password</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${u.name} · ${u.email}</div>
+      </div>
+      <button class="icon-btn" id="rp-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div class="field">
+        <label class="field-label">New password <span class="req">*</span></label>
+        <input class="input" type="text" id="rp-new" placeholder="At least 6 characters" autocomplete="new-password">
+        <div class="field-hint">Share this password with the user securely — they should change it after next login.</div>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="rp-cancel">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="rp-save">Reset password</button>
+    </div>
+  `;
+
+  document.getElementById('rp-close').onclick  = closeModal;
+  document.getElementById('rp-cancel').onclick = closeModal;
+  setTimeout(() => document.getElementById('rp-new').focus(), 50);
+
+  document.getElementById('rp-save').onclick = async () => {
+    const pw = document.getElementById('rp-new').value;
+    if (!pw || pw.length < 6) { document.getElementById('rp-new').focus(); toast('Password must be at least 6 characters', 'error'); return; }
+    const btn = document.getElementById('rp-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.resetUserPassword(u.id, pw);
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`Password reset for ${u.name}`);
+    } catch (err) {
+      toast(err.message || 'Reset failed', 'error');
+      btn.disabled = false; btn.textContent = 'Reset password';
+    }
+  };
+}
+
+function openDeleteUser(userId) {
+  const u = USERS.find(x => x.id === userId);
+  if (!u) return;
+  if (S.user && S.user.id === u.id) { toast('You cannot delete yourself', 'error'); return; }
+
+  document.getElementById('modal-box').style.maxWidth = '440px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div class="modal-title">Delete User?</div>
+      <button class="icon-btn" id="du-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:12px;display:flex;gap:10px;align-items:center;">
+        <div class="sb-avatar" style="width:38px;height:38px;font-size:12px;${u.role==='admin'?'background:var(--ok-bg);color:var(--ok-text);':'background:var(--info-bg);color:var(--info-text);'}">${u.avatar || u.name.slice(0,2).toUpperCase()}</div>
+        <div>
+          <div style="font-weight:600;font-size:14px;">${u.name}</div>
+          <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${u.email} · ${u.role === 'admin' ? 'Admin' : 'Operator'}</div>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--text-2);margin:0;">Permanently remove this account? The user will no longer be able to log in.</p>
+      <p style="font-size:12px;color:var(--warn-text);margin:0;">
+        Tip: consider <strong>Deactivating</strong> instead — that blocks login but keeps the user's name visible in history records (who did what).
+      </p>
+      <p style="font-size:12px;color:var(--danger-text);font-weight:500;margin:0;">This action cannot be undone.</p>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="du-cancel">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn" style="background:var(--danger-text);border-color:var(--danger-text);color:white;font-weight:600;" id="du-confirm">Delete user</button>
+    </div>
+  `;
+
+  document.getElementById('du-close').onclick  = closeModal;
+  document.getElementById('du-cancel').onclick = closeModal;
+  document.getElementById('du-confirm').onclick = async () => {
+    const name = u.name;
+    const btn = document.getElementById('du-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteUser(u.id);
+      await refreshUsers();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} deleted`, 'warn');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete user';
+    }
+  };
+}
+
 function openFacilityEditor(facilityId) {
   const editing = facilityId ? getFacility(facilityId) : null;
   const locations = [...new Set([...EQUIPMENT.map(e => e.location), ...FACILITIES.map(f => f.location)])].sort();
-  const draft = editing
+  S._facilityDraft = editing
     ? { ...editing }
     : { id:null, name:'', type:FACILITY_TYPES[0], location:locations[0]||'HQ', quantity:1, installedDate:'', notes:'', status:'active', photo:null };
 
   document.getElementById('modal-box').style.maxWidth = '520px';
   openModal('');
+  renderFacilityEditorModal(editing, locations);
+}
+
+function renderFacilityEditorModal(editing, locations) {
+  const draft = S._facilityDraft;
   document.getElementById('modal-inner').innerHTML = `
     <div class="modal-hd">
       <div>
@@ -66,6 +356,22 @@ function openFacilityEditor(facilityId) {
         <label class="field-label">Notes</label>
         <textarea class="input" id="fe-notes" rows="2" placeholder="Optional context — size, brand, serial, etc.">${esc(draft.notes || '')}</textarea>
       </div>
+
+      <div class="field">
+        <label class="field-label">Photo <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
+        <div class="photo-box ae-photo-box" id="fe-photo-box" style="cursor:pointer;overflow:hidden;position:relative;aspect-ratio:4/3;max-width:220px;">
+          ${draft.photo
+            ? `<img src="${draft.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:var(--r-md);position:absolute;inset:0;">
+               <div class="photo-replace-overlay">
+                 <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+               </div>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:26px;height:26px"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M3 9h18"/></svg>
+               <span style="font-size:11px;color:var(--text-3);margin-top:4px;">Click to upload</span>`}
+          <input type="file" accept="image/*" id="fe-photo-input" style="display:none;">
+        </div>
+        ${draft.photo ? `<button class="btn btn-sm" id="fe-photo-remove" style="color:var(--danger-text);border-color:var(--danger-border);margin-top:6px;">Remove photo</button>` : ''}
+      </div>
+
       <div class="field">
         <label class="field-label">Status</label>
         <div class="view-toggle">
@@ -81,38 +387,75 @@ function openFacilityEditor(facilityId) {
     </div>
   `;
 
-  document.getElementById('fe-close').onclick  = closeModal;
-  document.getElementById('fe-cancel').onclick = closeModal;
+  document.getElementById('fe-close').onclick  = () => { S._facilityDraft = null; closeModal(); document.getElementById('modal-box').style.maxWidth=''; };
+  document.getElementById('fe-cancel').onclick = () => { S._facilityDraft = null; closeModal(); document.getElementById('modal-box').style.maxWidth=''; };
   document.getElementById('fe-status-active').onclick  = () => { draft.status = 'active';  document.getElementById('fe-status-active').classList.add('active');  document.getElementById('fe-status-retired').classList.remove('active'); };
   document.getElementById('fe-status-retired').onclick = () => { draft.status = 'retired'; document.getElementById('fe-status-retired').classList.add('active'); document.getElementById('fe-status-active').classList.remove('active'); };
 
-  document.getElementById('fe-save').onclick = () => {
-    const name = document.getElementById('fe-name').value.trim();
-    const type = document.getElementById('fe-type').value;
-    const loc  = document.getElementById('fe-loc').value.trim();
-    const qty  = parseInt(document.getElementById('fe-qty').value) || 1;
-    const date = document.getElementById('fe-date').value;
-    const notes = document.getElementById('fe-notes').value.trim();
+  // Photo upload: click photo box → open file picker → preview + store
+  const photoBox   = document.getElementById('fe-photo-box');
+  const photoInput = document.getElementById('fe-photo-input');
+  photoBox.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', ev => {
+    const file = ev.target.files[0];
+    if (!file) return;
+    compressImage(file).then(dataUrl => {
+      draft.photo = dataUrl;
+      renderFacilityEditorModal(editing, locations);
+    }).catch(err => toast(err.message || 'Failed to read image', 'error'));
+  });
+  const photoRemoveBtn = document.getElementById('fe-photo-remove');
+  if (photoRemoveBtn) photoRemoveBtn.onclick = () => {
+    draft.photo = null;
+    renderFacilityEditorModal(editing, locations);
+  };
+
+  // Sync text fields back to draft on change (so re-render keeps them)
+  ['fe-name','fe-loc','fe-qty','fe-date','fe-notes'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      if (id === 'fe-name')  draft.name          = el.value;
+      if (id === 'fe-loc')   draft.location      = el.value;
+      if (id === 'fe-qty')   draft.quantity      = parseInt(el.value) || 1;
+      if (id === 'fe-date')  draft.installedDate = el.value;
+      if (id === 'fe-notes') draft.notes         = el.value;
+    });
+  });
+  document.getElementById('fe-type').addEventListener('change', e => { draft.type = e.target.value; });
+
+  document.getElementById('fe-save').onclick = async () => {
+    const name = draft.name.trim();
+    const loc  = draft.location.trim();
     if (!name) { document.getElementById('fe-name').focus(); toast('Name required', 'error'); return; }
     if (!loc)  { document.getElementById('fe-loc').focus();  toast('Location required', 'error'); return; }
 
-    if (editing) {
-      const f = getFacility(editing.id);
-      f.name = name; f.type = type; f.location = loc; f.quantity = qty;
-      f.installedDate = date || null; f.notes = notes; f.status = draft.status;
-      toast('Facility updated');
-    } else {
-      FACILITIES.push({
-        id: 'fac-' + Date.now(),
-        name, type, location: loc, quantity: qty,
-        installedDate: date || null, notes,
-        status: draft.status, photo: null,
-      });
-      toast('Facility added');
+    const payload = {
+      name, type: draft.type, location: loc, quantity: draft.quantity,
+      installedDate: draft.installedDate || null,
+      notes: (draft.notes || '').trim(),
+      status: draft.status,
+      photo: draft.photo || null,
+    };
+
+    const btn = document.getElementById('fe-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (editing) {
+        await API.updateFacility(editing.id, payload);
+        toast('Facility updated');
+      } else {
+        await API.createFacility(payload);
+        toast('Facility added');
+      }
+      await refreshFacilities();
+      S._facilityDraft = null;
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = editing ? 'Save changes' : 'Add facility';
     }
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    setTimeout(() => render(), 200);
   };
 }
 
@@ -155,16 +498,22 @@ function openDeleteFacility(facilityId) {
 
   document.getElementById('df-close').onclick  = closeModal;
   document.getElementById('df-cancel').onclick = closeModal;
-  document.getElementById('df-confirm').onclick = () => {
+  document.getElementById('df-confirm').onclick = async () => {
     const name = f.name;
-    // Cascade: remove jobs + history referencing this facility
-    for (let i = JOBS.length - 1;    i >= 0; i--) if (JOBS[i].entityType    === 'facility' && JOBS[i].entityId    === f.id) JOBS.splice(i, 1);
-    for (let i = HISTORY.length - 1; i >= 0; i--) if (HISTORY[i].entityType === 'facility' && HISTORY[i].entityId === f.id) HISTORY.splice(i, 1);
-    FACILITIES.splice(FACILITIES.indexOf(f), 1);
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${name} removed`, 'warn');
-    go('facilities');
+    const btn = document.getElementById('df-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteFacility(f.id);
+      // Server cascades jobs + history; refresh caches so UI stays accurate
+      await refreshFacilities();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} removed`, 'warn');
+      go('facilities');
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete facility';
+    }
   };
 }
 
@@ -362,61 +711,81 @@ function renderTemplateEditor() {
     renderTemplateEditor();
   };
 
-  document.getElementById('tpl-save').onclick = () => {
+  document.getElementById('tpl-save').onclick = async () => {
     const name = d.name.trim();
     if (!name) { document.getElementById('tpl-name').focus(); toast('Template name required', 'error'); return; }
 
     const finalServiceType = d.serviceType === '__custom__' ? d.customServiceType.trim() : d.serviceType;
     if (!finalServiceType) { toast('Service type required', 'error'); return; }
 
-    // Clean up items: drop any with both fields empty
-    const items = d.items.filter(i => i.bm.trim() || i.en.trim()).map(i => ({ id: i.id, bm: i.bm.trim(), en: i.en.trim() }));
+    const items = d.items.filter(i => i.bm.trim() || i.en.trim()).map(i => ({ bm: i.bm.trim(), en: i.en.trim() }));
     if (items.length === 0) { toast('Add at least one checklist item', 'error'); return; }
 
-    if (d.id) {
-      const t = getTemplate(d.id);
-      t.name = name;
-      t.equipmentType = d.equipmentType;
-      t.serviceType = finalServiceType;
-      t.status = d.status;
-      t.items = items;
-      toast('Template updated');
-    } else {
-      TEMPLATES.push({
-        id: 'tpl-' + Date.now(),
-        name, equipmentType: d.equipmentType, serviceType: finalServiceType, status: d.status, items,
-      });
-      toast('Template created');
-    }
+    const payload = {
+      name,
+      entityType:    d.entityType    || 'equipment',
+      equipmentType: d.equipmentType || null,
+      facilityType:  d.facilityType  || null,
+      serviceType:   finalServiceType,
+      status:        d.status,
+      items,
+    };
 
-    S.templateDraft = null;
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    setTimeout(() => render(), 200);
+    const btn = document.getElementById('tpl-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      if (d.id) {
+        await API.updateTemplate(d.id, payload);
+        toast('Template updated');
+      } else {
+        await API.createTemplate(payload);
+        toast('Template created');
+      }
+      await refreshTemplates();
+      S.templateDraft = null;
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = d.id ? 'Save changes' : 'Create template';
+    }
   };
 }
 
-function duplicateTemplate(templateId) {
+async function duplicateTemplate(templateId) {
   const t = getTemplate(templateId);
   if (!t) return;
-  TEMPLATES.push({
-    id: 'tpl-' + Date.now(),
-    name: t.name + ' (Copy)',
-    equipmentType: t.equipmentType,
-    serviceType: t.serviceType,
-    status: 'active',
-    items: t.items.map(i => ({ ...i, id: 'i-' + Date.now() + '-' + Math.random().toString(36).slice(2,6) })),
-  });
-  toast(`Duplicated · ${t.name}`);
-  render();
+  try {
+    await API.createTemplate({
+      name:          t.name + ' (Copy)',
+      entityType:    t.entityType,
+      equipmentType: t.equipmentType,
+      facilityType:  t.facilityType,
+      serviceType:   t.serviceType,
+      status:        'active',
+      items:         t.items.map(i => ({ bm: i.bm, en: i.en })),
+    });
+    await refreshTemplates();
+    toast(`Duplicated · ${t.name}`);
+    render();
+  } catch (err) {
+    toast(err.message || 'Duplicate failed', 'error');
+  }
 }
 
-function toggleTemplateStatus(templateId) {
+async function toggleTemplateStatus(templateId) {
   const t = getTemplate(templateId);
   if (!t) return;
-  t.status = t.status === 'active' ? 'inactive' : 'active';
-  toast(`${t.name} · ${t.status}`);
-  render();
+  const newStatus = t.status === 'active' ? 'inactive' : 'active';
+  try {
+    await API.updateTemplate(t.id, { status: newStatus });
+    await refreshTemplates();
+    toast(`${t.name} · ${newStatus}`);
+    render();
+  } catch (err) {
+    toast(err.message || 'Update failed', 'error');
+  }
 }
 
 function openDeleteTemplate(templateId) {
@@ -455,15 +824,22 @@ function openDeleteTemplate(templateId) {
 
   document.getElementById('dt-close').onclick  = closeModal;
   document.getElementById('dt-cancel').onclick = closeModal;
-  document.getElementById('dt-confirm').onclick = () => {
+  document.getElementById('dt-confirm').onclick = async () => {
     const name = t.name;
-    // Remove from jobs that reference it (set to null so job still exists, just has no template)
-    JOBS.forEach(j => { if (j.checklistId === t.id) j.checklistId = null; });
-    TEMPLATES.splice(TEMPLATES.indexOf(t), 1);
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${name} deleted`, 'warn');
-    setTimeout(() => render(), 200);
+    const btn = document.getElementById('dt-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteTemplate(t.id);
+      // Server sets checklistId to NULL on referencing jobs via ON DELETE SET NULL
+      await Promise.all([refreshTemplates(), refreshJobs()]);
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} deleted`, 'warn');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete template';
+    }
   };
 }
 
@@ -548,20 +924,28 @@ function openUpdateStock(partId) {
   document.querySelectorAll('input[name="us-mode"]').forEach(r => r.addEventListener('change', updatePreview));
   qtyInput.addEventListener('input', updatePreview);
 
-  document.getElementById('us-save').onclick = () => {
+  document.getElementById('us-save').onclick = async () => {
     const mode = document.querySelector('input[name="us-mode"]:checked').value;
     const qty  = parseFloat(qtyInput.value);
     if (isNaN(qty) || qty < 0) { qtyInput.focus(); toast('Enter a valid quantity', 'error'); return; }
     if (mode === 'add' && qty === 0) { qtyInput.focus(); toast('Quantity must be more than 0', 'error'); return; }
 
     const oldStock = p.stock;
-    if (mode === 'add') p.stock += qty;
-    else                p.stock  = qty;
+    const newStock = mode === 'add' ? oldStock + qty : qty;
 
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${p.name} stock updated · ${oldStock} → ${p.stock} ${p.unit}`);
-    setTimeout(() => render(), 200);
+    const btn = document.getElementById('us-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updatePart(p.id, { stock: newStock });
+      await refreshParts();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${p.name} stock updated · ${oldStock} → ${newStock} ${p.unit}`);
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Update failed', 'error');
+      btn.disabled = false; btn.textContent = 'Update stock';
+    }
   };
 }
 
@@ -588,7 +972,7 @@ function openEditPartInCatalog(partId) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="field">
-          <label class="field-label">Part code / number <span class="req">*</span></label>
+          <label class="field-label">Part number <span class="req">*</span></label>
           <input class="input" id="epc-code" value="${p.code}" autocomplete="off" style="text-transform:uppercase;">
         </div>
         <div class="field">
@@ -627,7 +1011,7 @@ function openEditPartInCatalog(partId) {
 
   document.getElementById('epc-close').onclick  = closeModal;
   document.getElementById('epc-cancel').onclick = closeModal;
-  document.getElementById('epc-save').onclick = () => {
+  document.getElementById('epc-save').onclick = async () => {
     const name  = document.getElementById('epc-name').value.trim();
     const code  = document.getElementById('epc-code').value.trim().toUpperCase();
     const cat   = document.getElementById('epc-cat').value.trim();
@@ -636,27 +1020,178 @@ function openEditPartInCatalog(partId) {
     const minSt = parseInt(document.getElementById('epc-min').value) || 0;
 
     if (!name) { document.getElementById('epc-name').focus(); toast('Part name required', 'error'); return; }
-    if (!code) { document.getElementById('epc-code').focus(); toast('Part code required', 'error'); return; }
+    if (!code) { document.getElementById('epc-code').focus(); toast('Part number required', 'error'); return; }
     if (!cat)  { document.getElementById('epc-cat').focus();  toast('Category required',  'error'); return; }
-    // Check code collision against other parts (not self)
-    if (PARTS.some(x => x.id !== p.id && x.code.toUpperCase() === code)) {
-      document.getElementById('epc-code').focus();
-      toast(`Part code "${code}" already exists on another part`, 'error');
-      return;
+
+    const btn = document.getElementById('epc-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updatePart(p.id, { name, code, cat, unit, price, minStock: minSt });
+      await refreshParts();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Part updated');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = 'Save changes';
     }
-
-    p.name     = name;
-    p.code     = code;
-    p.cat      = cat;
-    p.unit     = unit;
-    p.price    = price;
-    p.minStock = minSt;
-
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Part updated');
-    setTimeout(() => render(), 200);
   };
+}
+
+/* openCalDayEvents — list all events for a specific calendar date in a modal.
+   Used when the user clicks "+N more" on a calendar cell that has overflow. */
+function openCalDayEvents(dateStr) {
+  // Scope events to the current page context (main maintenance / equipment detail / facility detail)
+  let events = [];
+  if (S.page === 'equipment-detail') {
+    const id = S.selectedEquipment;
+    const jobs = JOBS.filter(j => j.equipId === id);
+    const hist = HISTORY.filter(h => h.equipId === id);
+    const bds  = BREAKDOWNS.filter(b => b.equipId === id);
+    events = buildMaintEvents(jobs, hist, bds);
+  } else if (S.page === 'facility-detail') {
+    const id = S.selectedFacility;
+    const jobs = JOBS.filter(j => j.entityType === 'facility' && j.entityId === id);
+    const hist = HISTORY.filter(h => h.entityType === 'facility' && h.entityId === id);
+    events = buildMaintEvents(jobs, hist, []);
+  } else {
+    events = buildMaintEvents(JOBS, HISTORY, BREAKDOWNS);
+  }
+  events = events.filter(ev => ev.date === dateStr);
+
+  const dateLabel = fmtDate(dateStr);
+  document.getElementById('modal-box').style.maxWidth = '460px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">Events on ${dateLabel}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${events.length} item${events.length===1?'':'s'} scheduled this day</div>
+      </div>
+      <button class="icon-btn" id="cd-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+      ${events.length === 0 ? `
+        <div style="text-align:center;padding:20px 8px;font-size:13px;color:var(--text-3);">No events on this date.</div>
+      ` : `
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${events.map(ev => `
+            <a href="#" class="card-click cal-day-event-row"
+               data-nav="${ev.navPage}"
+               ${ev.equipId    ? `data-equip="${ev.equipId}"` : ''}
+               ${ev.facilityId ? `data-facility="${ev.facilityId}"` : ''}
+               ${ev.jobId      ? `data-job="${ev.jobId}"` : ''}
+               style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:0.5px solid var(--border-2);border-radius:var(--r-md);text-decoration:none;color:inherit;background:var(--card-bg);">
+              <span class="cal-event-dot cal-event-${ev.status}" style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${ev.status==='overdue'?'var(--danger-text)':ev.status==='upcoming'?'var(--warn-text)':ev.status==='inprogress'?'var(--info-text)':ev.status==='completed'?'var(--ok-text)':'var(--bd-text)'};"></span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${ev.title}</div>
+                <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${ev.tooltip.split('·').slice(1).join('·').trim() || ev.status}</div>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px;color:var(--text-3);flex-shrink:0;"><polyline points="9 18 15 12 9 6"/></svg>
+            </a>
+          `).join('')}
+        </div>
+      `}
+    </div>
+    <div class="modal-ft">
+      <div style="flex:1"></div>
+      <button class="btn" id="cd-close-2">Close</button>
+    </div>
+  `;
+  const close = () => { closeModal(); document.getElementById('modal-box').style.maxWidth = ''; };
+  document.getElementById('cd-close').onclick   = close;
+  document.getElementById('cd-close-2').onclick = close;
+
+  // Wire each row to navigate (modal content was injected after render(), so manual binding needed)
+  document.querySelectorAll('#modal-inner .cal-day-event-row').forEach(row => {
+    row.addEventListener('click', e => {
+      e.preventDefault();
+      const page = row.dataset.nav;
+      const job  = row.dataset.job;
+      const eq   = row.dataset.equip;
+      const fac  = row.dataset.facility;
+      if (job) S.selectedJob = job;
+      if (eq)  S.selectedEquipment = eq;
+      if (fac) S.selectedFacility = fac;
+      close();
+      go(page);
+    });
+  });
+}
+
+/* openPartCompat — shows which equipment a part is compatible with, plus the qty used per service. */
+function openPartCompat(partId) {
+  const p = PARTS.find(x => x.id === partId);
+  if (!p) return;
+  const rows = EQUIPMENT
+    .map(e => {
+      const link = (e.parts || []).find(ep => ep.partId === p.id);
+      return link ? { equip: e, qty: link.qty } : null;
+    })
+    .filter(Boolean);
+
+  document.getElementById('modal-box').style.maxWidth = '480px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">Compatible equipment</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${p.name} · <span class="code">${p.code}</span></div>
+      </div>
+      <button class="icon-btn" id="pc-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      ${rows.length === 0 ? `
+        <div style="text-align:center;padding:16px 8px;font-size:13px;color:var(--text-3);">
+          This part isn't linked to any equipment yet.
+        </div>
+      ` : `
+        <div style="font-size:11.5px;color:var(--text-3);margin-bottom:8px;">Used on ${rows.length} equipment · qty is consumed per service.</div>
+        <div style="display:flex;flex-direction:column;">
+          ${rows.map((r,i) => `
+            <a href="#" class="card-click" data-nav="equipment-detail" data-equip="${r.equip.id}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;text-decoration:none;color:inherit;${i>0?'border-top:0.5px solid var(--border)':''}">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+                <span class="code" style="flex-shrink:0;">${r.equip.code}</span>
+                <div style="min-width:0;">
+                  <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.equip.name}</div>
+                  <div style="font-size:11px;color:var(--text-3);">${r.equip.type} · ${r.equip.location}</div>
+                </div>
+              </div>
+              <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+                <div style="font-size:13px;font-weight:600;">× ${r.qty}</div>
+                <div style="font-size:10px;color:var(--text-3);">${p.unit}/service</div>
+              </div>
+            </a>
+          `).join('')}
+        </div>
+      `}
+    </div>
+    <div class="modal-ft">
+      <div style="flex:1"></div>
+      <button class="btn" id="pc-close-2">Close</button>
+    </div>
+  `;
+  const close = () => { closeModal(); document.getElementById('modal-box').style.maxWidth = ''; };
+  document.getElementById('pc-close').onclick   = close;
+  document.getElementById('pc-close-2').onclick = close;
+
+  // Modal content is injected after render() runs, so data-nav bindings don't reach it.
+  // Wire the equipment rows manually: click → navigate to equipment detail.
+  document.querySelectorAll('#modal-inner [data-nav="equipment-detail"]').forEach(row => {
+    row.addEventListener('click', e => {
+      e.preventDefault();
+      const equipId = row.dataset.equip;
+      if (!equipId) return;
+      close();
+      S.selectedEquipment = equipId;
+      go('equipment-detail');
+    });
+  });
 }
 
 function openDeletePartFromCatalog(partId) {
@@ -701,23 +1236,22 @@ function openDeletePartFromCatalog(partId) {
 
   document.getElementById('dpc-close').onclick  = closeModal;
   document.getElementById('dpc-cancel').onclick = closeModal;
-  document.getElementById('dpc-confirm').onclick = () => {
+  document.getElementById('dpc-confirm').onclick = async () => {
     const name = p.name;
-    // Remove from all equipment's parts lists
-    EQUIPMENT.forEach(e => {
-      if (e.parts) e.parts = e.parts.filter(ep => ep.partId !== p.id);
-    });
-    // Remove from all jobs' requiredPartIds
-    JOBS.forEach(j => {
-      if (j.requiredPartIds) j.requiredPartIds = j.requiredPartIds.filter(pid => pid !== p.id);
-    });
-    // Remove from catalog
-    PARTS.splice(PARTS.indexOf(p), 1);
-
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${name} removed from catalog`, 'warn');
-    setTimeout(() => render(), 200);
+    const btn = document.getElementById('dpc-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deletePart(p.id);
+      // Cascade already handled by FK in DB; refresh caches that may have referenced this part
+      await Promise.all([refreshParts(), refreshEquipment()]);
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} removed from catalog`, 'warn');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete part';
+    }
   };
 }
 
@@ -741,7 +1275,7 @@ function openAddPartToCatalog(onSaved) {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="field">
-          <label class="field-label">Part code / number <span class="req">*</span></label>
+          <label class="field-label">Part number <span class="req">*</span></label>
           <input class="input" id="apc-code" placeholder="e.g. T-1637" autocomplete="off" style="text-transform:uppercase;">
         </div>
         <div class="field">
@@ -785,7 +1319,7 @@ function openAddPartToCatalog(onSaved) {
 
   document.getElementById('apc-close').onclick  = closeModal;
   document.getElementById('apc-cancel').onclick = closeModal;
-  document.getElementById('apc-save').onclick = () => {
+  document.getElementById('apc-save').onclick = async () => {
     const name  = document.getElementById('apc-name').value.trim();
     const code  = document.getElementById('apc-code').value.trim().toUpperCase();
     const cat   = document.getElementById('apc-cat').value.trim();
@@ -795,29 +1329,26 @@ function openAddPartToCatalog(onSaved) {
     const minSt = parseInt(document.getElementById('apc-min').value) || 0;
 
     if (!name) { document.getElementById('apc-name').focus(); toast('Part name required', 'error'); return; }
-    if (!code) { document.getElementById('apc-code').focus(); toast('Part code required', 'error'); return; }
+    if (!code) { document.getElementById('apc-code').focus(); toast('Part number required', 'error'); return; }
     if (!cat)  { document.getElementById('apc-cat').focus();  toast('Category required',  'error'); return; }
-    if (PARTS.some(p => p.code.toUpperCase() === code)) {
-      document.getElementById('apc-code').focus();
-      toast(`Part code "${code}" already exists`, 'error');
-      return;
-    }
 
-    const newPart = {
-      id: 'p-' + Date.now(),
-      name, code, cat, unit, price,
-      stock, minStock: minSt,
-    };
-    PARTS.push(newPart);
+    const btn = document.getElementById('apc-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const { id } = await API.createPart({ name, code, cat, unit, price, stock, minStock: minSt });
+      await refreshParts();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} added to catalog`);
 
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${name} added to catalog`);
-
-    if (typeof onSaved === 'function') {
-      setTimeout(() => onSaved(newPart.id), 200);
-    } else {
-      setTimeout(() => render(), 200);
+      if (typeof onSaved === 'function') {
+        setTimeout(() => onSaved(id), 100);
+      } else {
+        setTimeout(() => render(), 100);
+      }
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = 'Add to catalog';
     }
   };
 }
@@ -899,16 +1430,25 @@ function openAddEquipmentPart(equipId, preselectPartId) {
       });
     };
 
-    document.getElementById('aep-save').onclick = () => {
+    document.getElementById('aep-save').onclick = async () => {
       const partId = sel.value;
       const qty    = parseFloat(document.getElementById('aep-qty').value);
       if (!partId)          { sel.focus(); toast('Select a part', 'error'); return; }
       if (!qty || qty <= 0) { document.getElementById('aep-qty').focus(); toast('Enter a valid quantity', 'error'); return; }
-      e.parts.push({ partId, qty });
-      closeModal();
-      document.getElementById('modal-box').style.maxWidth = '';
-      toast('Part added to equipment');
-      setTimeout(() => render(), 200);
+
+      const btn = document.getElementById('aep-save');
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try {
+        await API.addEquipmentPart(e.id, partId, qty);
+        await refreshEquipment();
+        closeModal();
+        document.getElementById('modal-box').style.maxWidth = '';
+        toast('Part added to equipment');
+        setTimeout(() => render(), 100);
+      } catch (err) {
+        toast(err.message || 'Save failed', 'error');
+        btn.disabled = false; btn.textContent = 'Add part';
+      }
     };
   }
 }
@@ -937,7 +1477,7 @@ function openEditEquipmentPart(equipId, partId) {
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
       <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:10px 12px;font-size:12px;">
         <div class="flex-between"><span class="text-3">Part</span><span style="font-weight:500;">${part.name}</span></div>
-        <div class="flex-between"><span class="text-3">Code</span><span class="code">${part.code}</span></div>
+        <div class="flex-between"><span class="text-3">Part number</span><span class="code">${part.code}</span></div>
         <div class="flex-between"><span class="text-3">Current stock</span><span>${part.stock} ${part.unit}</span></div>
       </div>
       <div class="field">
@@ -958,15 +1498,24 @@ function openEditEquipmentPart(equipId, partId) {
 
   document.getElementById('eep-close').onclick  = closeModal;
   document.getElementById('eep-cancel').onclick = closeModal;
-  document.getElementById('eep-save').onclick = () => {
+  document.getElementById('eep-save').onclick = async () => {
     const qty = parseFloat(document.getElementById('eep-qty').value);
     if (!qty || qty <= 0) { document.getElementById('eep-qty').focus(); toast('Enter a valid quantity', 'error'); return; }
     if (qty === ep.qty) { closeModal(); document.getElementById('modal-box').style.maxWidth = ''; return; }
-    ep.qty = qty;
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Quantity updated');
-    setTimeout(() => render(), 200);
+
+    const btn = document.getElementById('eep-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updateEquipmentPart(e.id, partId, qty);
+      await refreshEquipment();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Quantity updated');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
   };
 }
 
@@ -1008,18 +1557,20 @@ function removeEquipmentPart(equipId, partId) {
 
   document.getElementById('rep-close').onclick  = closeModal;
   document.getElementById('rep-cancel').onclick = closeModal;
-  document.getElementById('rep-confirm').onclick = () => {
-    e.parts = e.parts.filter(ep => ep.partId !== partId);
-    // Cascade: remove from any job's requiredPartIds too
-    JOBS.forEach(j => {
-      if (j.equipId === equipId && j.requiredPartIds) {
-        j.requiredPartIds = j.requiredPartIds.filter(pid => pid !== partId);
-      }
-    });
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Part removed', 'warn');
-    setTimeout(() => render(), 200);
+  document.getElementById('rep-confirm').onclick = async () => {
+    const btn = document.getElementById('rep-confirm');
+    btn.disabled = true; btn.textContent = 'Removing…';
+    try {
+      await API.removeEquipmentPart(equipId, partId);
+      await refreshEquipment();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Part removed', 'warn');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Remove failed', 'error');
+      btn.disabled = false; btn.textContent = 'Remove';
+    }
   };
 }
 
@@ -1068,20 +1619,22 @@ function openDeleteEquipment(equipId) {
 
   document.getElementById('deq-close').onclick  = closeModal;
   document.getElementById('deq-cancel').onclick = closeModal;
-  document.getElementById('deq-confirm').onclick = () => {
+  document.getElementById('deq-confirm').onclick = async () => {
     const name = e.name;
-    EQUIPMENT.splice(EQUIPMENT.indexOf(e), 1);
-    // Remove all associated records
-    [JOBS, HISTORY, BREAKDOWNS, FUEL_ENTRIES].forEach(arr => {
-      for (let i = arr.length - 1; i >= 0; i--) {
-        if (arr[i].equipId === equipId) arr.splice(i, 1);
-      }
-    });
-    delete FUEL_LOGS[equipId];
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${name} removed`, 'warn');
-    go('equipment');
+    const btn = document.getElementById('deq-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteEquipment(equipId);
+      // Server cascades jobs/history/breakdowns/fuel_entries/equipment_parts
+      await refreshEquipment();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${name} removed`, 'warn');
+      go('equipment');
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete equipment';
+    }
   };
 }
 
@@ -1170,34 +1723,44 @@ function renderEditEquipmentModal(e) {
     box.querySelector('.ee-photo-input').addEventListener('change', ev => {
       const file = ev.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = evt => {
-        S.editEquipPhotos[ev.target.dataset.angle] = evt.target.result;
+      compressImage(file).then(dataUrl => {
+        S.editEquipPhotos[ev.target.dataset.angle] = dataUrl;
         renderEditEquipmentModal(e);
-      };
-      reader.readAsDataURL(file);
+      }).catch(err => toast(err.message || 'Failed to read image', 'error'));
     });
   });
 
-  document.getElementById('ee-save-btn').onclick = () => {
+  document.getElementById('ee-save-btn').onclick = async () => {
     const get = (f) => document.querySelector(`.ee-input[data-field="${f}"]`).value;
-    e.name     = get('name').trim();
-    e.code     = get('code').trim().toUpperCase();
-    e.type     = get('type');
-    e.location = get('location');
-    e.make     = get('make').trim();
-    e.model    = get('model').trim();
-    e.engine   = get('engine').trim();
-    e.fuel     = get('fuel');
-    e.capacity = get('capacity').trim();
-    e.hours    = parseInt(get('hours')) || 0;
-    e.purchase = get('purchase') || null;
-    e.photos   = { ...S.editEquipPhotos };
-    S.editEquipPhotos = null;
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Equipment updated');
-    setTimeout(() => render(), 200);
+    const payload = {
+      name:     get('name').trim(),
+      code:     get('code').trim().toUpperCase(),
+      type:     get('type'),
+      location: get('location'),
+      make:     get('make').trim(),
+      model:    get('model').trim(),
+      engine:   get('engine').trim(),
+      fuel:     get('fuel'),
+      capacity: get('capacity').trim(),
+      hours:    parseInt(get('hours')) || 0,
+      purchase: get('purchase') || null,
+      photos:   { ...S.editEquipPhotos },
+    };
+
+    const btn = document.getElementById('ee-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updateEquipment(e.id, payload);
+      await refreshEquipment();
+      S.editEquipPhotos = null;
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Equipment updated');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
   };
 }
 
@@ -1232,6 +1795,8 @@ function openCloseJob(jobId) {
   if (!e) return;
   const parts = isFac ? [] : jobRequiredParts(j);
   const today = new Date().toISOString().slice(0, 10);
+  // Auto parts cost — sum of price × qty for each required part.
+  const partsCostAuto = parts.reduce((sum, rp) => sum + ((rp.part?.price || 0) * (rp.qty || 1)), 0);
 
   document.getElementById('modal-box').style.maxWidth = '540px';
   openModal('');
@@ -1255,7 +1820,7 @@ function openCloseJob(jobId) {
 
       <div class="field">
         <label class="field-label">Technician <span class="req">*</span></label>
-        <input class="input" id="cj-tech" placeholder="Who performed the work?" autocomplete="off">
+        <input class="input" id="cj-tech" placeholder="Who performed the work?" autocomplete="off" value="${S.user ? S.user.name : ''}">
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -1274,24 +1839,47 @@ function openCloseJob(jobId) {
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      ${isFac ? '' : j.basis === 'hour' ? `
         <div class="field">
-          <label class="field-label">Actual cost (RM) <span class="req">*</span></label>
-          <input class="input" type="number" id="cj-cost" value="${j.estCost || ''}" min="0" step="1">
+          <label class="field-label">Meter reading (op. hrs) <span class="req">*</span></label>
+          <input class="input" type="number" id="cj-meter" value="${e.hours}" min="${e.hours}" step="1">
+          <div class="field-hint">Current reading: ${e.hours.toLocaleString()} hrs · cannot go backwards</div>
         </div>
-        ${isFac ? '' : j.basis === 'hour' ? `
-          <div class="field">
-            <label class="field-label">Meter reading (op. hrs) <span class="req">*</span></label>
-            <input class="input" type="number" id="cj-meter" value="${e.hours}" min="${e.hours}" step="1">
-            <div class="field-hint">Current reading: ${e.hours.toLocaleString()} hrs · cannot go backwards</div>
+      ` : `
+        <div class="field">
+          <label class="field-label">Meter reading (op. hrs) <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
+          <input class="input" type="number" id="cj-meter" placeholder="${e.hours}" min="${e.hours}" step="1">
+          <div class="field-hint">Current: ${e.hours.toLocaleString()} hrs · update if different</div>
+        </div>
+      `}
+
+      <div>
+        <div class="ae-section-label">Cost breakdown</div>
+        <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:10px;">
+          <div class="flex-between" style="font-size:12px;">
+            <span class="text-3">Parts cost (auto)</span>
+            <span style="font-weight:600;" id="cj-parts-cost">${fmtRM(partsCostAuto)}</span>
           </div>
-        ` : `
-          <div class="field">
-            <label class="field-label">Meter reading (op. hrs) <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
-            <input class="input" type="number" id="cj-meter" placeholder="${e.hours}" min="${e.hours}" step="1">
-            <div class="field-hint">Current: ${e.hours.toLocaleString()} hrs · update if different</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="field" style="margin:0;">
+              <label class="field-label">Labor (RM)</label>
+              <input class="input" type="number" id="cj-labor" value="0" min="0" step="1">
+            </div>
+            <div class="field" style="margin:0;">
+              <label class="field-label">Misc / other (RM)</label>
+              <input class="input" type="number" id="cj-misc" value="0" min="0" step="1">
+            </div>
           </div>
-        `}
+          <div class="flex-between" style="font-size:13px;border-top:0.5px solid var(--border);padding-top:8px;">
+            <span style="font-weight:600;">Total</span>
+            <span style="font-weight:700;color:var(--ok-text);" id="cj-total">${fmtRM(partsCostAuto)}</span>
+          </div>
+          ${partsCostAuto === 0 && parts.length > 0 ? `
+            <div style="font-size:11px;color:var(--text-3);font-style:italic;">
+              Parts total is RM 0 — set prices in the Parts catalog so auto-cost works.
+            </div>
+          ` : ''}
+        </div>
       </div>
 
       ${parts.length > 0 ? `
@@ -1335,60 +1923,68 @@ function openCloseJob(jobId) {
 
   document.getElementById('cj-close').onclick  = closeModal;
   document.getElementById('cj-cancel').onclick = closeModal;
-  document.getElementById('cj-confirm').onclick = () => {
+
+  // Live total = parts (auto) + labor + misc
+  const laborInput = document.getElementById('cj-labor');
+  const miscInput  = document.getElementById('cj-misc');
+  const totalEl    = document.getElementById('cj-total');
+  const recalcTotal = () => {
+    const labor = parseFloat(laborInput.value) || 0;
+    const misc  = parseFloat(miscInput.value)  || 0;
+    totalEl.textContent = fmtRM(partsCostAuto + labor + misc);
+  };
+  laborInput.addEventListener('input', recalcTotal);
+  miscInput.addEventListener('input',  recalcTotal);
+
+  document.getElementById('cj-confirm').onclick = async () => {
     const tech  = document.getElementById('cj-tech').value.trim();
     const date  = document.getElementById('cj-date').value;
     const hrs   = parseInt(document.getElementById('cj-hrs').value) || 0;
     const min   = parseInt(document.getElementById('cj-min').value) || 0;
-    const cost  = parseFloat(document.getElementById('cj-cost').value);
+    const labor = parseFloat(laborInput.value) || 0;
+    const misc  = parseFloat(miscInput.value)  || 0;
     const meterField = document.getElementById('cj-meter');
     const meter = meterField && meterField.value !== '' ? parseInt(meterField.value) : null;
     const notes = document.getElementById('cj-notes').value.trim();
 
     if (!tech) { document.getElementById('cj-tech').focus(); toast('Technician name required', 'error'); return; }
     if (!date) { document.getElementById('cj-date').focus(); toast('Completion date required', 'error'); return; }
-    if (isNaN(cost) || cost < 0) { document.getElementById('cj-cost').focus(); toast('Enter a valid cost', 'error'); return; }
+    if (labor < 0 || misc < 0) { toast('Cost values cannot be negative', 'error'); return; }
     if (j.basis === 'hour' && (meter === null || meter < e.hours)) {
       meterField.focus();
       toast(`Meter reading must be ≥ ${e.hours}`, 'error');
       return;
     }
 
-    const duration = (hrs > 0 || min > 0)
-      ? `${hrs}h ${String(min).padStart(2,'0')}m`
-      : '—';
+    const duration = (hrs > 0 || min > 0) ? `${hrs}h ${String(min).padStart(2,'0')}m` : '—';
 
-    HISTORY.unshift({
-      id:        'h-' + Date.now(),
-      entityType: isFac ? 'facility' : 'equipment',
-      entityId:   isFac ? e.id : (j.entityId || j.equipId),
-      equipId:   isFac ? null : (j.entityId || j.equipId),
-      equipCode: j.equipCode,
-      equipName: j.equipName,
-      type:      j.type,
-      date,
-      duration,
-      cost:      Math.round(cost),
-      parts:     parts.length,
-      tech,
-      status:    'completed',
-      notes:     notes || null,
-    });
-
-    parts.forEach(rp => {
-      const p = PARTS.find(x => x.id === rp.partId);
-      if (p) p.stock = Math.max(0, p.stock - rp.qty);
-    });
-
-    if (!isFac && meter !== null) e.hours = meter;
-
-    JOBS.splice(JOBS.indexOf(j), 1);
-    S.checks = {};
-
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${e.name} · ${j.type} completed · logged to history`);
-    setTimeout(() => go('maintenance'), 400);
+    const btn = document.getElementById('cj-confirm');
+    btn.disabled = true; btn.textContent = 'Closing…';
+    try {
+      await API.closeJob(j.id, {
+        tech, date, duration,
+        laborCost: Math.round(labor),
+        miscCost:  Math.round(misc),
+        meter,
+        notes: notes || null,
+      });
+      // Server did: history insert + stock deduction + hours update + job delete — all atomic.
+      // Pull fresh data for everything that changed.
+      await Promise.all([
+        refreshJobs(),
+        refreshHistory(),
+        refreshParts(),
+        refreshEquipment(),
+      ]);
+      S.checks = {};
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${e.name} · ${j.type} completed · logged to history`);
+      setTimeout(() => go('maintenance'), 300);
+    } catch (err) {
+      toast(err.message || 'Failed to close job', 'error');
+      btn.disabled = false; btn.textContent = 'Close job';
+    }
   };
 }
 
@@ -1413,6 +2009,7 @@ function openReportBreakdown(equipId) {
           <option value="">Select equipment…</option>
           ${EQUIPMENT.map(e => `<option value="${e.id}" ${e.id===preselect?'selected':''}>${e.code} · ${e.name} · ${e.location}</option>`).join('')}
         </select>
+        <div id="bd-dup-warn" style="margin-top:8px;"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="field">
@@ -1456,7 +2053,7 @@ function openReportBreakdown(equipId) {
       </div>
       <div class="field">
         <label class="field-label">Reported by <span class="req">*</span></label>
-        <input class="input" id="bd-reporter" placeholder="Your name" autocomplete="off">
+        <input class="input" id="bd-reporter" placeholder="Your name" autocomplete="off" value="${S.user ? S.user.name : ''}">
       </div>
       <div class="field">
         <label class="field-label">Immediate action taken <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
@@ -1484,13 +2081,46 @@ function openReportBreakdown(equipId) {
     });
   });
 
-  document.getElementById('bd-submit-btn').onclick = () => {
+  // Duplicate-report warning — refreshes as user changes the equipment selection.
+  const equipSel = document.getElementById('bd-equip');
+  const warnSlot = document.getElementById('bd-dup-warn');
+  const renderDupWarn = () => {
+    const id = equipSel.value;
+    const existing = id ? BREAKDOWNS.find(b => b.equipId === id && b.status === 'active') : null;
+    if (!existing) { warnSlot.innerHTML = ''; return; }
+    warnSlot.innerHTML = `
+      <div class="alert-banner alert-warning" style="font-size:12px;display:flex;align-items:flex-start;gap:8px;padding:10px 12px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <div style="flex:1;">
+          <div style="font-weight:600;margin-bottom:2px;">Already has an active breakdown</div>
+          <div style="opacity:0.9;">Reported by <strong>${existing.reportedBy}</strong> on ${fmtDate(existing.date)} ${existing.time} · severity <strong>${existing.severity}</strong>. Submit only if this is a separate issue.</div>
+        </div>
+      </div>
+    `;
+  };
+  equipSel.addEventListener('change', renderDupWarn);
+  renderDupWarn();   // run once for the preselected equipment
+
+  document.getElementById('bd-submit-btn').onclick = async () => {
     const equipId  = document.getElementById('bd-equip').value;
     const desc     = document.getElementById('bd-desc').value.trim();
     const reporter = document.getElementById('bd-reporter').value.trim();
     if (!equipId)  { document.getElementById('bd-equip').focus(); toast('Select equipment', 'error'); return; }
     if (!desc)     { document.getElementById('bd-desc').focus();  toast('Describe the problem', 'error'); return; }
     if (!reporter) { document.getElementById('bd-reporter').focus(); toast('Enter your name', 'error'); return; }
+
+    const existing = BREAKDOWNS.find(b => b.equipId === equipId && b.status === 'active');
+    if (existing) {
+      const ok = await confirmAction({
+        title: 'Already has active breakdown',
+        message: `This equipment already has an active breakdown reported by <strong>${existing.reportedBy}</strong> on ${fmtDate(existing.date)} ${existing.time} (severity: <strong>${existing.severity}</strong>).<br><br>Submit only if this is a genuinely separate issue.`,
+        confirmLabel: 'Submit as separate report',
+        cancelLabel:  'Cancel',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+
     saveBreakdown({
       equipId,
       date:       document.getElementById('bd-date').value,
@@ -1502,33 +2132,29 @@ function openReportBreakdown(equipId) {
   };
 }
 
-function saveBreakdown(data) {
+async function saveBreakdown(data) {
   const equip = EQUIPMENT.find(e => e.id === data.equipId);
   if (!equip) return;
 
-  const newBd = {
-    id: 'bd-' + Date.now(),
-    equipId:     equip.id,
-    equipCode:   equip.code,
-    equipName:   equip.name,
-    date:        data.date,
-    time:        data.time,
-    reportedBy:  data.reportedBy,
-    description: data.description,
-    severity:    data.severity,
-    status:      'active',
-    resolvedDate: null, resolvedBy: null, resolutionNotes: null,
-  };
+  try {
+    await API.createBreakdown({
+      equipId:     equip.id,
+      date:        data.date,
+      time:        data.time,
+      reportedBy:  data.reportedBy,
+      description: data.description,
+      severity:    data.severity,
+    });
+    // Server flips equipment.status to 'breakdown' as part of the transaction
+    await Promise.all([refreshBreakdowns(), refreshEquipment()]);
 
-  BREAKDOWNS.unshift(newBd);
-  equip.status = 'breakdown';
-
-  closeModal();
-  document.getElementById('modal-box').style.maxWidth = '';
-  toast(`Breakdown reported · ${equip.name}`, 'warn');
-
-  // Navigate to equipment detail to see the breakdown
-  setTimeout(() => go('equipment-detail', { selectedEquipment: equip.id }), 400);
+    closeModal();
+    document.getElementById('modal-box').style.maxWidth = '';
+    toast(`Breakdown reported · ${equip.name}`, 'warn');
+    setTimeout(() => go('equipment-detail', { selectedEquipment: equip.id }), 300);
+  } catch (err) {
+    toast(err.message || 'Failed to report breakdown', 'error');
+  }
 }
 
 function openResolveBreakdown(bdId) {
@@ -1562,7 +2188,7 @@ function openResolveBreakdown(bdId) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="field">
           <label class="field-label">Resolved by <span class="req">*</span></label>
-          <input class="input" id="res-by" placeholder="Technician name" autocomplete="off">
+          <input class="input" id="res-by" placeholder="Technician name" autocomplete="off" value="${S.user ? S.user.name : ''}">
         </div>
         <div class="field">
           <label class="field-label">Resolution date</label>
@@ -1582,25 +2208,31 @@ function openResolveBreakdown(bdId) {
 
   document.getElementById('res-close').onclick  = closeModal;
   document.getElementById('res-cancel').onclick = closeModal;
-  document.getElementById('res-submit').onclick = () => {
+  document.getElementById('res-submit').onclick = async () => {
     const notes = document.getElementById('res-notes').value.trim();
     const by    = document.getElementById('res-by').value.trim();
     if (!notes) { document.getElementById('res-notes').focus(); toast('Enter resolution notes', 'error'); return; }
     if (!by)    { document.getElementById('res-by').focus();    toast('Enter technician name', 'error'); return; }
 
-    bd.status           = 'resolved';
-    bd.resolutionNotes  = notes;
-    bd.resolvedBy       = by;
-    bd.resolvedDate     = document.getElementById('res-date').value;
+    const btn = document.getElementById('res-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.resolveBreakdown(bd.id, {
+        resolutionNotes: notes,
+        resolvedBy:      by,
+        resolvedDate:    document.getElementById('res-date').value,
+      });
+      // Server flips equipment.status back to 'ok' if no other active breakdowns remain
+      await Promise.all([refreshBreakdowns(), refreshEquipment()]);
 
-    // Restore equipment status
-    const equip = EQUIPMENT.find(e => e.id === bd.equipId);
-    if (equip) equip.status = 'ok';
-
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast(`${bd.equipName} marked as resolved`, 'success');
-    setTimeout(() => render(), 300);
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${bd.equipName} marked as resolved`, 'success');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Resolve failed', 'error');
+      btn.disabled = false; btn.textContent = 'Confirm resolved';
+    }
   };
 }
 
@@ -1689,21 +2321,33 @@ function openEditBreakdown(bdId) {
     });
   });
 
-  document.getElementById('ebd-save').onclick = () => {
+  document.getElementById('ebd-save').onclick = async () => {
     const desc     = document.getElementById('ebd-desc').value.trim();
     const reporter = document.getElementById('ebd-reporter').value.trim();
     if (!desc)     { document.getElementById('ebd-desc').focus();     toast('Enter description', 'error'); return; }
     if (!reporter) { document.getElementById('ebd-reporter').focus(); toast('Enter reporter name', 'error'); return; }
     const action = document.getElementById('ebd-action').value.trim();
-    bd.date        = document.getElementById('ebd-date').value;
-    bd.time        = document.getElementById('ebd-time').value;
-    bd.description = desc + (action ? '\n\nImmediate action: ' + action : '');
-    bd.severity    = document.querySelector('input[name="ebd-sev"]:checked').value;
-    bd.reportedBy  = reporter;
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Breakdown report updated');
-    setTimeout(() => render(), 300);
+    const payload = {
+      date:        document.getElementById('ebd-date').value,
+      time:        document.getElementById('ebd-time').value,
+      description: desc + (action ? '\n\nImmediate action: ' + action : ''),
+      severity:    document.querySelector('input[name="ebd-sev"]:checked').value,
+      reportedBy:  reporter,
+    };
+
+    const btn = document.getElementById('ebd-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updateBreakdown(bd.id, payload);
+      await refreshBreakdowns();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Breakdown report updated');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Save failed', 'error');
+      btn.disabled = false; btn.textContent = 'Save changes';
+    }
   };
 }
 
@@ -1739,21 +2383,21 @@ function openDeleteBreakdown(bdId) {
 
   document.getElementById('dbd-close').onclick  = closeModal;
   document.getElementById('dbd-cancel').onclick = closeModal;
-  document.getElementById('dbd-confirm').onclick = () => {
-    const wasActive = bd.status === 'active';
-    const equipId   = bd.equipId;
-    BREAKDOWNS.splice(BREAKDOWNS.indexOf(bd), 1);
-    if (wasActive) {
-      const stillActive = BREAKDOWNS.some(b => b.equipId === equipId && b.status === 'active');
-      if (!stillActive) {
-        const equip = EQUIPMENT.find(e => e.id === equipId);
-        if (equip) equip.status = 'ok';
-      }
+  document.getElementById('dbd-confirm').onclick = async () => {
+    const btn = document.getElementById('dbd-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteBreakdown(bd.id);
+      // Server restores equipment.status to 'ok' if no other active breakdowns remain
+      await Promise.all([refreshBreakdowns(), refreshEquipment()]);
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast('Breakdown report deleted', 'warn');
+      setTimeout(() => render(), 100);
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete report';
     }
-    closeModal();
-    document.getElementById('modal-box').style.maxWidth = '';
-    toast('Breakdown report deleted', 'warn');
-    setTimeout(() => render(), 300);
   };
 }
 
@@ -1801,7 +2445,7 @@ function openLogFuel(equipId) {
       </div>
       <div class="field">
         <label class="field-label">Refuelled by</label>
-        <input class="input" id="lf-by" placeholder="Operator / technician name" autocomplete="off">
+        <input class="input" id="lf-by" placeholder="Operator / technician name" autocomplete="off" value="${S.user ? S.user.name : ''}">
       </div>
       <div class="field">
         <label class="field-label">Notes <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
@@ -1849,31 +2493,28 @@ function openLogFuel(equipId) {
   };
 }
 
-function saveFuelEntry(data) {
+async function saveFuelEntry(data) {
   const equip = EQUIPMENT.find(e => e.id === data.equipId);
   if (!equip) return;
-  FUEL_ENTRIES.unshift({
-    id:             'fe-' + Date.now(),
-    equipId:        equip.id,
-    equipCode:      equip.code,
-    equipName:      equip.name,
-    date:           data.date,
-    litres:         data.litres,
-    operatingHours: data.operatingHours,
-    pricePerLitre:  data.pricePerLitre,
-    totalCost:      data.totalCost,
-    refuelledBy:    data.refuelledBy,
-    notes:          data.notes,
-  });
-  const slot = fuelMonthSlot(data.date);
-  if (slot >= 0) {
-    if (!FUEL_LOGS[equip.id]) FUEL_LOGS[equip.id] = [0, 0, 0, 0, 0, 0];
-    FUEL_LOGS[equip.id][slot] += data.litres;
+  try {
+    await API.createFuelEntry({
+      equipId:        equip.id,
+      date:           data.date,
+      litres:         data.litres,
+      operatingHours: data.operatingHours,
+      pricePerLitre:  data.pricePerLitre,
+      totalCost:      data.totalCost,
+      refuelledBy:    data.refuelledBy,
+      notes:          data.notes,
+    });
+    await refreshFuelEntries();
+    closeModal();
+    document.getElementById('modal-box').style.maxWidth = '';
+    toast(`Fuel logged · ${equip.name} · ${data.litres} L`, 'success');
+    setTimeout(() => render(), 100);
+  } catch (err) {
+    toast(err.message || 'Failed to log fuel', 'error');
   }
-  closeModal();
-  document.getElementById('modal-box').style.maxWidth = '';
-  toast(`Fuel logged · ${equip.name} · ${data.litres} L`, 'success');
-  setTimeout(() => render(), 300);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2076,12 +2717,10 @@ function bindAddEquipHandlers() {
     box.querySelector('.ae-photo-input').addEventListener('change', e => {
       const file = e.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        S.addEquipData.photos[e.target.dataset.angle] = ev.target.result;
+      compressImage(file).then(dataUrl => {
+        S.addEquipData.photos[e.target.dataset.angle] = dataUrl;
         renderAddEquipModal();
-      };
-      reader.readAsDataURL(file);
+      }).catch(err => toast(err.message || 'Failed to read image', 'error'));
     });
   });
 
@@ -2153,13 +2792,10 @@ function aeError(field, msg) {
   return false;
 }
 
-function saveNewEquipment() {
+async function saveNewEquipment() {
   collectAEInputs();
-  const d  = S.addEquipData;
-  const id = 'eq-' + Date.now();
-
-  const newEquip = {
-    id,
+  const d = S.addEquipData;
+  const payload = {
     name:     d.name.trim(),
     code:     d.code.trim().toUpperCase(),
     type:     d.type,
@@ -2175,16 +2811,18 @@ function saveNewEquipment() {
     photos:   { front: d.photos.front, rear: d.photos.rear, left: d.photos.left, right: d.photos.right },
   };
 
-  EQUIPMENT.push(newEquip);
-  FUEL_LOGS[id] = [0, 0, 0, 0, 0, 0];
-
-  const badge = document.getElementById('nav-count-equipment');
-  if (badge) badge.textContent = EQUIPMENT.length;
-
-  closeModal();
-  document.getElementById('modal-box').style.maxWidth = '';
-  toast(`${newEquip.name} added · ${newEquip.code}`);
-  setTimeout(() => go('equipment-detail', { selectedEquipment: id }), 350);
+  try {
+    const { id } = await API.createEquipment(payload);
+    await refreshEquipment();
+    closeModal();
+    document.getElementById('modal-box').style.maxWidth = '';
+    toast(`${payload.name} added · ${payload.code}`);
+    setTimeout(() => go('equipment-detail', { selectedEquipment: id }), 350);
+    return;
+  } catch (err) {
+    toast(err.message || 'Failed to create equipment', 'error');
+    return;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -2258,6 +2896,8 @@ function attachHandlers() {
 
   // Navigation via data-nav
   document.querySelectorAll('[data-nav]').forEach(el => {
+    if (el._navBound) return;
+    el._navBound = true;
     el.addEventListener('click', e => {
       e.stopPropagation();
       const page = el.dataset.nav;
@@ -2267,6 +2907,8 @@ function attachHandlers() {
       if (job)   S.selectedJob = job;
       if (equip) S.selectedEquipment = equip;
       if (fac)   S.selectedFacility = fac;
+      // Nav-entering the schedule page always starts fresh; openEditJob bypasses this path.
+      if (page === 'schedule') S.scheduleForm = null;
       go(page);
     });
   });
@@ -2283,50 +2925,23 @@ function attachHandlers() {
 
   // Action buttons
   document.querySelectorAll('[data-action]').forEach(el => {
+    if (el._actionBound) return;
+    el._actionBound = true;
     el.addEventListener('click', () => {
       const act = el.dataset.action;
       if (act === 'cancel-schedule') {
+        const editingJobId = S.scheduleForm && S.scheduleForm.editJobId;
         S.scheduleForm = null;
-        go('maintenance');
+        if (editingJobId) go('job', { selectedJob: editingJobId });
+        else              go('maintenance');
       } else if (act === 'save-schedule') {
-        const sf = S.scheduleForm;
-        if (!sf) return;
-        const isFac = sf.entityType === 'facility';
-        if (isFac && !sf.facilityId) { toast('Select facility first', 'error'); return; }
-        if (!isFac && !sf.equipId)   { toast('Select equipment first', 'error'); return; }
-        const basis = isFac ? 'time' : sf.basis;
-        if (basis === 'time' && !sf.dueDate)  { toast('Set a due date', 'error'); return; }
-        if (basis === 'hour' && !sf.dueHours) { toast('Set due hours', 'error'); return; }
-        if (sf.type === 'Custom' && !(sf.customType || '').trim()) { toast('Enter a custom type label', 'error'); return; }
-        const entity = isFac ? getFacility(sf.facilityId) : EQUIPMENT.find(x => x.id === sf.equipId);
-        const effectiveType = sf.type === 'Custom' ? sf.customType.trim() : sf.type;
-        const newJob = {
-          id: 'job-' + Date.now(),
-          entityType:    isFac ? 'facility' : 'equipment',
-          entityId:      entity.id,
-          equipId:       isFac ? null : entity.id,
-          equipName:     entity.name,
-          equipCode:     isFac ? entity.type : entity.code,
-          type:          effectiveType,
-          basis,
-          dueHours:      basis === 'hour' ? parseInt(sf.dueHours) : null,
-          currentHours:  isFac ? null : entity.hours,
-          dueDate:       basis === 'time' ? sf.dueDate : null,
-          status:        'upcoming',
-          priority:      effectiveType === 'Major Service' ? 'high' : effectiveType === 'Minor Service' ? 'medium' : 'low',
-          location:      entity.location,
-          started:       null,
-          checklistId:   sf.checklistId || null,
-          estCost:       parseInt(sf.estCost) || 0,
-          requiredPartIds: isFac ? [] : [...sf.requiredPartIds],
-          notes:         sf.notes,
-        };
-        JOBS.push(newJob);
-        S.scheduleForm = null;
-        toast(`Job scheduled · ${entity.name} · ${effectiveType}`);
-        setTimeout(() => go('maintenance'), 400);
+        saveScheduleFromForm();
       } else if (act === 'complete-job') {
         openCloseJob(el.dataset.job || S.selectedJob);
+      } else if (act === 'edit-job') {
+        openEditJob(el.dataset.job || S.selectedJob);
+      } else if (act === 'delete-job') {
+        openDeleteJob(el.dataset.job || S.selectedJob);
       } else if (act === 'delete-equipment') {
         openDeleteEquipment(el.dataset.equip || S.selectedEquipment);
       } else if (act === 'edit-equipment') {
@@ -2343,6 +2958,10 @@ function attachHandlers() {
         openEditPartInCatalog(el.dataset.part);
       } else if (act === 'delete-part-item') {
         openDeletePartFromCatalog(el.dataset.part);
+      } else if (act === 'view-part-compat') {
+        openPartCompat(el.dataset.part);
+      } else if (act === 'show-cal-day') {
+        openCalDayEvents(el.dataset.date);
       } else if (act === 'view-template') {
         openViewTemplate(el.dataset.template);
       } else if (act === 'add-template') {
@@ -2369,6 +2988,14 @@ function attachHandlers() {
         S.scheduleForm.type = 'Monthly Service';
         S.scheduleForm.checklistId = suggestChecklistFor(S.scheduleForm.facilityId, 'Monthly Service', 'facility');
         go('schedule');
+      } else if (act === 'schedule-for-equipment') {
+        const equipId = el.dataset.equip || S.selectedEquipment;
+        S.scheduleForm = freshScheduleForm();
+        S.scheduleForm.entityType = 'equipment';
+        S.scheduleForm.equipId    = equipId;
+        S.scheduleForm.checklistId = suggestChecklistFor(equipId, S.scheduleForm.type, 'equipment');
+        S.scheduleForm.requiredPartIds = defaultRequiredPartsFor(equipId, S.scheduleForm.type);
+        go('schedule');
       } else if (act === 'close-notifs') {
         setNotifications(false);
       } else if (act === 'navigate-from-notif') {
@@ -2376,6 +3003,18 @@ function attachHandlers() {
         setNotifications(false);
       } else if (act === 'export-report') {
         exportReportCsv();
+      } else if (act === 'export-history-csv') {
+        exportHistoryCsv();
+      } else if (act === 'add-user') {
+        openUserEditor(null);
+      } else if (act === 'edit-user') {
+        openUserEditor(el.dataset.user);
+      } else if (act === 'toggle-user-active') {
+        toggleUserActive(el.dataset.user);
+      } else if (act === 'reset-user-password') {
+        openResetUserPassword(el.dataset.user);
+      } else if (act === 'delete-user') {
+        openDeleteUser(el.dataset.user);
       } else if (act === 'logout') {
         handleLogout();
       } else if (act === 'report-breakdown') {
@@ -2502,7 +3141,17 @@ function attachHandlers() {
   const filterStatus = document.getElementById('filter-status');
   if (filterStatus) filterStatus.addEventListener('change', e => { S.equipFilters.status = e.target.value; render(); });
 
-  // History search
+  // History page — tabs, period + asset filter, search
+  document.querySelectorAll('[data-history-tab]').forEach(el => {
+    el.addEventListener('click', () => {
+      S.historyTab = el.dataset.historyTab;
+      render();
+    });
+  });
+  const histPeriod = document.getElementById('hist-period');
+  if (histPeriod) histPeriod.addEventListener('change', e => { S.historyPeriod = e.target.value; render(); });
+  const histAsset  = document.getElementById('hist-asset-filter');
+  if (histAsset)   histAsset.addEventListener('change',  e => { S.historyAssetFilter = e.target.value; render(); });
   bindSearchInput('hist-search', 'histSearch');
 
   // Parts search & filter
@@ -2510,6 +3159,10 @@ function attachHandlers() {
   const partsFilterEl = document.getElementById('parts-filter');
   if (partsFilterEl) {
     partsFilterEl.addEventListener('change', e => { S.partsFilter = e.target.value; render(); });
+  }
+  const partsEquipFilterEl = document.getElementById('parts-equip-filter');
+  if (partsEquipFilterEl) {
+    partsEquipFilterEl.addEventListener('change', e => { S.partsEquipFilter = e.target.value; render(); });
   }
 
   // Templates search & filters
@@ -2523,6 +3176,13 @@ function attachHandlers() {
 
   // Facilities search & filters
   bindSearchInput('facility-search', 'facilitySearch');
+
+  // Users search & filters
+  bindSearchInput('user-search', 'userSearch');
+  const userRoleEl = document.getElementById('user-filter-role');
+  if (userRoleEl) userRoleEl.addEventListener('change', e => { S.userFilterRole = e.target.value; render(); });
+  const userStatusEl = document.getElementById('user-filter-status');
+  if (userStatusEl) userStatusEl.addEventListener('change', e => { S.userFilterStatus = e.target.value; render(); });
   const facLoc = document.getElementById('facility-filter-loc');
   if (facLoc) facLoc.addEventListener('change', e => { S.facilityFilterLocation = e.target.value; render(); });
   const facType = document.getElementById('facility-filter-type');
@@ -2598,39 +3258,202 @@ function toggleNotifications() {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   SCHEDULE JOB — async save helper (called from attachHandlers)
+   ═══════════════════════════════════════════════════════════ */
+
+async function saveScheduleFromForm() {
+  const sf = S.scheduleForm;
+  if (!sf) return;
+  const isFac = sf.entityType === 'facility';
+  if (isFac && !sf.facilityId) { toast('Select facility first', 'error'); return; }
+  if (!isFac && !sf.equipId)   { toast('Select equipment first', 'error'); return; }
+  const basis = isFac ? 'time' : sf.basis;
+  if (basis === 'time' && !sf.dueDate)  { toast('Set a due date', 'error'); return; }
+  if (basis === 'hour' && !sf.dueHours) { toast('Set due hours', 'error'); return; }
+  if (sf.type === 'Custom' && !(sf.customType || '').trim()) { toast('Enter a custom type label', 'error'); return; }
+
+  const entity = isFac ? getFacility(sf.facilityId) : EQUIPMENT.find(x => x.id === sf.equipId);
+  if (!entity) { toast('Selected item not found', 'error'); return; }
+  const effectiveType = sf.type === 'Custom' ? sf.customType.trim() : sf.type;
+  const isEdit = !!sf.editJobId;
+
+  const payload = {
+    entityType:    isFac ? 'facility' : 'equipment',
+    entityId:      entity.id,
+    type:          effectiveType,
+    basis,
+    dueHours:      basis === 'hour' ? parseInt(sf.dueHours) : null,
+    currentHours:  isFac ? null : entity.hours,
+    dueDate:       basis === 'time' ? sf.dueDate : null,
+    location:      entity.location,
+    checklistId:   sf.checklistId || null,
+    estCost:       parseInt(sf.estCost) || 0,
+    requiredPartIds: isFac ? [] : [...sf.requiredPartIds],
+    notes:         sf.notes,
+  };
+  // On create only — set initial status/priority/started. On edit, preserve those.
+  if (!isEdit) {
+    payload.status   = 'upcoming';
+    payload.priority = effectiveType === 'Major Service' ? 'high' : effectiveType === 'Minor Service' ? 'medium' : 'low';
+    payload.started  = null;
+  }
+
+  try {
+    if (isEdit) {
+      await API.updateJob(sf.editJobId, payload);
+      await refreshJobs();
+      const jobId = sf.editJobId;
+      S.scheduleForm = null;
+      toast(`Job updated · ${entity.name} · ${effectiveType}`);
+      setTimeout(() => go('job', { selectedJob: jobId }), 200);
+    } else {
+      await API.createJob(payload);
+      await refreshJobs();
+      S.scheduleForm = null;
+      toast(`Job scheduled · ${entity.name} · ${effectiveType}`);
+      setTimeout(() => go('maintenance'), 300);
+    }
+  } catch (err) {
+    toast(err.message || (isEdit ? 'Failed to update job' : 'Failed to schedule job'), 'error');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   EDIT / DELETE JOB (admin)
+   ═══════════════════════════════════════════════════════════ */
+
+function openEditJob(jobId) {
+  const j = JOBS.find(x => x.id === jobId);
+  if (!j) { toast('Job not found', 'error'); return; }
+
+  const isFac = j.entityType === 'facility';
+  const fixedTypes = SERVICE_TYPES_FIXED;
+  const typeIsCustom = !fixedTypes.includes(j.type);
+
+  S.scheduleForm = {
+    editJobId:   j.id,
+    entityType:  j.entityType || (isFac ? 'facility' : 'equipment'),
+    equipId:     isFac ? '' : (j.equipId || j.entityId || ''),
+    facilityId:  isFac ? (j.entityId || '') : '',
+    type:        typeIsCustom ? 'Custom' : j.type,
+    customType:  typeIsCustom ? j.type : '',
+    basis:       j.basis || 'time',
+    dueDate:     j.dueDate || '',
+    dueHours:    j.dueHours != null ? String(j.dueHours) : '',
+    estCost:     j.estCost != null ? String(j.estCost) : '',
+    checklistId: j.checklistId || '',
+    notes:       j.notes || '',
+    requiredPartIds: Array.isArray(j.requiredPartIds) ? [...j.requiredPartIds] : [],
+  };
+  go('schedule');
+}
+
+function openDeleteJob(jobId) {
+  const j = JOBS.find(x => x.id === jobId);
+  if (!j) { toast('Job not found', 'error'); return; }
+
+  document.getElementById('modal-box').style.maxWidth = '440px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div class="modal-title">Delete Job?</div>
+      <button class="icon-btn" id="dj-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:12px;">
+        <div style="font-weight:600;font-size:14px;">${j.equipName} · ${j.type}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:2px;">${j.equipCode} · ${j.basis === 'hour' ? (j.dueHours||0).toLocaleString()+' hrs' : fmtDate(j.dueDate)}</div>
+      </div>
+      <p style="font-size:12px;color:var(--text-2);margin:0;">The job will be removed from the schedule. No history record is created.</p>
+      <p style="font-size:12px;color:var(--danger-text);font-weight:500;margin:0;">This action cannot be undone.</p>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="dj-cancel">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn" style="background:var(--danger-text);border-color:var(--danger-text);color:white;font-weight:600;" id="dj-confirm">Delete job</button>
+    </div>
+  `;
+
+  document.getElementById('dj-close').onclick  = closeModal;
+  document.getElementById('dj-cancel').onclick = closeModal;
+  document.getElementById('dj-confirm').onclick = async () => {
+    const label = `${j.equipName} · ${j.type}`;
+    const btn = document.getElementById('dj-confirm');
+    btn.disabled = true; btn.textContent = 'Deleting…';
+    try {
+      await API.deleteJob(j.id);
+      await refreshJobs();
+      closeModal();
+      document.getElementById('modal-box').style.maxWidth = '';
+      toast(`${label} deleted`, 'warn');
+      setTimeout(() => go('maintenance'), 100);
+    } catch (err) {
+      toast(err.message || 'Delete failed', 'error');
+      btn.disabled = false; btn.textContent = 'Delete job';
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
    AUTH / LOGIN
    ═══════════════════════════════════════════════════════════ */
 
-function handleLogin(email, password) {
-  const user = authenticate(email, password);
+async function handleLogin(email, password) {
   const errEl = document.getElementById('login-error');
-  if (!user) {
-    if (errEl) { errEl.textContent = 'Invalid email or password. Check your credentials and try again.'; errEl.style.display = 'block'; }
-    return;
+  const btn   = document.querySelector('#login-form button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  try {
+    const { user } = await API.login(email, password);
+    S.loggedIn = true;
+    S.user     = user;
+    S.role     = user.role;
+    S.page     = 'overview';
+    if (errEl) errEl.style.display = 'none';
+    showLoader(`Welcome, ${user.name.split(' ')[0]} — loading your data…`);
+    try       { await loadAllData(); }
+    finally   { hideLoader(); }
+    updateSidebarUser();
+    render();
+    setTimeout(() => toast(`Welcome, ${user.name.split(' ')[0]}`), 200);
+  } catch (err) {
+    if (errEl) { errEl.textContent = err.message || 'Login failed. Check credentials and try again.'; errEl.style.display = 'block'; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
   }
-  S.loggedIn = true;
-  S.user     = user;
-  S.role     = user.role;
-  S.page     = 'overview';
-  if (errEl) errEl.style.display = 'none';
-  updateSidebarUser();
-  render();
-  setTimeout(() => toast(`Welcome, ${user.name.split(' ')[0]}`), 200);
 }
 
-function handleLogout() {
+async function handleLogout() {
   const name = S.user ? S.user.name.split(' ')[0] : '';
+  try { await API.logout(); } catch (e) { /* proceed even if server unreachable */ }
   S.loggedIn = false;
   S.user     = null;
-  // Keep S.role default to ops for safety
   S.role     = 'ops';
   S.page     = 'overview';
-  // Reset any in-flight form state
   S.scheduleForm = null;
   S.checks       = {};
   updateSidebarUser();
   render();
   if (name) setTimeout(() => toast(`Signed out · bye ${name}`, 'info'), 200);
+}
+
+// On page load, check if a session is still valid — avoids forcing re-login on refresh
+async function restoreSession() {
+  try {
+    const { user } = await API.me();
+    if (user) {
+      S.loggedIn = true;
+      S.user     = user;
+      S.role     = user.role;
+      showLoader('Restoring your session…');
+      try     { await loadAllData(); }
+      finally { hideLoader(); }
+      updateSidebarUser();
+      render();
+    }
+  } catch (e) {
+    // Not logged in, or server unreachable — stay on login screen
+  }
 }
 
 function updateSidebarUser() {
@@ -2754,3 +3577,4 @@ function attachGlobals() {
 attachGlobals();
 render();
 syncNav();
+restoreSession();
