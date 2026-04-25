@@ -2055,6 +2055,7 @@ function openCloseJob(jobId) {
       S.proofPhotos = [];
       closeModal();
       document.getElementById('modal-box').style.maxWidth = '';
+      fireConfetti();   // Celebration burst on job completion
       toast(`${e.name} · ${j.type} completed · logged to history`);
       // If the job was recurring, surface the next auto-scheduled job
       if (result && result.nextJobId) {
