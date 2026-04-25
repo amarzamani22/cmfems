@@ -1368,6 +1368,89 @@ tbody tr.clickable { cursor: pointer; }
 }
 
 /* ════════════════════════════════════════════════
+   WELCOME SPLASH — shown once after a fresh login.
+   ════════════════════════════════════════════════ */
+.welcome-splash {
+  position: fixed; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  animation: welcomeFadeIn 0.4s ease-out;
+  cursor: pointer;
+}
+.welcome-splash.closing { animation: welcomeFadeOut 0.4s ease-in forwards; }
+@keyframes welcomeFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes welcomeFadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+.welcome-card {
+  background: var(--card-bg);
+  color: var(--text-1);
+  padding: 48px 56px;
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+  max-width: 380px;
+  cursor: default;
+  animation: welcomeCardPop 0.6s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+@keyframes welcomeCardPop {
+  from { opacity: 0; transform: scale(0.85) translateY(15px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+.welcome-logo-wrap {
+  display: flex; align-items: center; justify-content: center;
+  width: 110px; height: 110px;
+  margin: 0 auto;
+  animation: welcomeLogoIn 1.0s ease-out 0.2s both;
+}
+.welcome-logo {
+  max-width: 100%; max-height: 100%;
+  object-fit: contain;
+  animation: welcomeLogoPulse 2.4s ease-in-out 1.2s infinite;
+}
+@keyframes welcomeLogoIn {
+  0%   { opacity: 0; transform: scale(0.6);  filter: blur(8px); }
+  60%  { opacity: 1; transform: scale(1.05); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1);    filter: blur(0); }
+}
+@keyframes welcomeLogoPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.04); }
+}
+
+.welcome-greeting {
+  font-size: 16px; color: var(--text-3); font-weight: 500;
+  margin-top: 18px;
+  opacity: 0;
+  animation: welcomeFadeUp 0.6s ease-out 0.6s forwards;
+}
+.welcome-name {
+  font-size: 32px; font-weight: 700; color: var(--text-1);
+  margin-top: 4px; line-height: 1.1;
+  opacity: 0;
+  animation: welcomeFadeUp 0.6s ease-out 0.75s forwards;
+}
+.welcome-sub {
+  font-size: 13px; color: var(--text-3);
+  margin-top: 14px;
+  opacity: 0;
+  animation: welcomeFadeUp 0.6s ease-out 0.95s forwards;
+}
+@keyframes welcomeFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 480px) {
+  .welcome-card { padding: 36px 32px; max-width: 90%; }
+  .welcome-logo-wrap { width: 90px; height: 90px; }
+  .welcome-name { font-size: 26px; }
+}
+
+/* ════════════════════════════════════════════════
    CONFIRM DIALOG (styled replacement for native confirm)
    ════════════════════════════════════════════════ */
 .confirm-overlay {
