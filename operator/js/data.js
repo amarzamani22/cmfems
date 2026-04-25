@@ -417,13 +417,17 @@ const S = {
   selectedEquipment: null,
   selectedJob: null,
   checks: {},
+  proofPhotos: [],          // photos attached to the currently-open job, sent on Complete
   equipSearch: '',
   equipFilters: { location: 'all', type: 'all', status: 'all' },
   equipSort:    'name',         // 'name' | 'code' | 'type' | 'status'
+  equipSortDir: 'asc',          // 'asc' | 'desc'
   maintFilter: 'all',
   maintFilters: { location: 'all', type: 'all', basis: 'all' },
   maintSort:   'due',           // 'due' | 'priority' | 'type' | 'equipment'
+  maintSortDir: 'asc',
   facilitySort: 'name',         // 'name' | 'type' | 'location'
+  facilitySortDir: 'asc',
   histSearch: '',
   historyTab: 'maintenance',      // 'maintenance' | 'breakdowns' | 'fuel'
   historyPeriod: '3m',            // 'all' | '1w' | '1m' | '3m' | '1y'
