@@ -709,6 +709,41 @@ function bindSortBar(dataAttr, keyState, dirState) {
   });
 }
 
+/* showWelcomeSplash — splash overlay shown once after a fresh login. */
+function showWelcomeSplash(displayName) {
+  const existing = document.getElementById('welcome-splash');
+  if (existing) existing.remove();
+
+  const h = new Date().getHours();
+  let greeting;
+  if      (h >= 5  && h < 12) greeting = 'Good morning,';
+  else if (h >= 12 && h < 18) greeting = 'Good afternoon,';
+  else if (h >= 18 && h < 22) greeting = 'Good evening,';
+  else                        greeting = 'Hello,';
+
+  const splash = document.createElement('div');
+  splash.id = 'welcome-splash';
+  splash.className = 'welcome-splash';
+  splash.innerHTML = `
+    <div class="welcome-card">
+      <div class="welcome-logo-wrap">
+        <img class="welcome-logo" src="logo.png" alt="Car Medic" onerror="this.style.display='none'">
+      </div>
+      <div class="welcome-greeting">${greeting}</div>
+      <div class="welcome-name">${displayName}!</div>
+      <div class="welcome-sub">Have a great shift today</div>
+    </div>
+  `;
+  document.body.appendChild(splash);
+
+  const close = () => {
+    splash.classList.add('closing');
+    setTimeout(() => splash.remove(), 400);
+  };
+  splash.addEventListener('click', close);
+  setTimeout(close, 3500);
+}
+
 /* compressImage — resize + re-encode an image File to a data URL.
    - Scales so the longest edge is at most `maxDim` px
    - Saves as JPEG at `quality` (0..1)
