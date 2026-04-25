@@ -706,6 +706,22 @@ function bindSearchInput(inputId, stateKey) {
   }, 400));
 }
 
+/* bindSortBar — wires sort-pill buttons emitted by renderSortBar(). */
+function bindSortBar(dataAttr, keyState, dirState) {
+  document.querySelectorAll(`[${dataAttr}]`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newKey = btn.getAttribute(dataAttr);
+      if (S[keyState] === newKey) {
+        S[dirState] = (S[dirState] === 'desc') ? 'asc' : 'desc';
+      } else {
+        S[keyState] = newKey;
+        S[dirState] = 'asc';
+      }
+      render();
+    });
+  });
+}
+
 /* exportReportCsv — download maintenance history as CSV */
 
 function exportReportCsv() {
