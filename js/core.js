@@ -113,13 +113,40 @@ function effectiveStatus(j) {
   if (!j) return 'upcoming';
   if (j.status !== 'upcoming') return j.status;
   if (j.basis === 'hour' && j.currentHours != null && j.dueHours != null) {
-    return j.currentHours > j.dueHours ? 'overdue' : 'upcoming';
+    // Reaching the due hour itself (current == due) is overdue —
+    // the meter has already hit the service threshold and the job needs to be done.
+    return j.currentHours >= j.dueHours ? 'overdue' : 'upcoming';
   }
   if (j.dueDate) {
     const today = new Date().toISOString().slice(0, 10);
     return j.dueDate < today ? 'overdue' : 'upcoming';
   }
   return 'upcoming';
+}
+
+/* hourJobThreshold — how close (in op hrs) is "due soon" for an hour-based job.
+   Scales with recurrence interval (10% of interval, minimum 50 hrs). For non-recurring
+   jobs, fall back to 50 hrs. Shared between effectiveEquipmentStatus, overview, and
+   notification logic so the warning band is consistent everywhere. */
+function hourJobThreshold(j) {
+  const interval = j.recurrenceHours && j.recurrenceHours > 0 ? j.recurrenceHours : 0;
+  return interval > 0 ? Math.max(50, Math.round(interval * 0.1)) : 50;
+}
+
+/* isJobDueSoon — upcoming job within the warning band (next 7 days for time-based,
+   within hour threshold for hour-based). Excludes already-overdue jobs. */
+function isJobDueSoon(j) {
+  if (effectiveStatus(j) !== 'upcoming') return false;
+  if (j.basis === 'hour' && j.dueHours != null && j.currentHours != null) {
+    const gap = j.dueHours - j.currentHours;
+    return gap > 0 && gap <= hourJobThreshold(j);
+  }
+  if (j.basis === 'time' && j.dueDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    return j.dueDate >= today && j.dueDate <= weekStr;
+  }
+  return false;
 }
 
 /* effectiveEquipmentStatus — derive an equipment's health from its jobs + breakdowns.
@@ -132,18 +159,7 @@ function effectiveEquipmentStatus(e) {
   if (BREAKDOWNS.some(b => b.equipId === e.id && b.status === 'active')) return 'breakdown';
   const eqJobs = JOBS.filter(j => j.equipId === e.id && j.status !== 'completed');
   if (eqJobs.some(j => effectiveStatus(j) === 'overdue')) return 'overdue';
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-  const weekStr  = new Date(today.getTime() + 7 * 86400000).toISOString().slice(0, 10);
-  const HOUR_WARN_THRESHOLD = 50; // "due soon" if within ~50 operating hours (~1 work week)
-  if (eqJobs.some(j => {
-    if (j.basis === 'time' && j.dueDate) return j.dueDate >= todayStr && j.dueDate <= weekStr;
-    if (j.basis === 'hour' && j.dueHours != null && j.currentHours != null) {
-      const gap = j.dueHours - j.currentHours;
-      return gap >= 0 && gap <= HOUR_WARN_THRESHOLD;
-    }
-    return false;
-  })) return 'warning';
+  if (eqJobs.some(j => isJobDueSoon(j))) return 'warning';
   return 'ok';
 }
 
@@ -387,12 +403,33 @@ function buildNotifications() {
     } else if (j.basis === 'hour' && j.dueHours) {
       const diff = j.currentHours - j.dueHours;
       if (diff > 0) overdueBy = ` — ${diff} hrs past`;
+      else if (diff === 0) overdueBy = ' — meter reached due';
     }
     items.push({
       group:   'overdue',
       title:   `${j.equipName} · ${j.type}`,
       sub:     `Overdue${overdueBy}`,
       severity:'danger',
+      navPage: 'job',
+      jobId:   j.id,
+    });
+  });
+
+  // Due-soon jobs — approaching threshold, surface before they slip overdue.
+  JOBS.filter(j => isJobDueSoon(j)).forEach(j => {
+    let when = '';
+    if (j.basis === 'hour' && j.dueHours != null && j.currentHours != null) {
+      const gap = j.dueHours - j.currentHours;
+      when = `due in ${gap} hr${gap === 1 ? '' : 's'} · ${j.currentHours.toLocaleString()} / ${j.dueHours.toLocaleString()}`;
+    } else if (j.basis === 'time' && j.dueDate) {
+      const days = Math.round((new Date(j.dueDate) - new Date()) / 86400000);
+      when = days === 0 ? 'due today' : `due in ${days} day${days === 1 ? '' : 's'}`;
+    }
+    items.push({
+      group:   'duesoon',
+      title:   `${j.equipName} · ${j.type}`,
+      sub:     `Due soon — ${when}`,
+      severity:'warn',
       navPage: 'job',
       jobId:   j.id,
     });
@@ -435,6 +472,7 @@ function renderNotificationPanel() {
     { key:'breakdown', label:'Active breakdowns',      icon:'bd',     viewAllPage:'equipment' },
     { key:'blocked',   label:'Jobs blocked by parts',  icon:'danger', viewAllPage:'maintenance' },
     { key:'overdue',   label:'Overdue jobs',           icon:'danger', viewAllPage:'maintenance' },
+    { key:'duesoon',   label:'Due soon',               icon:'warn',   viewAllPage:'maintenance' },
     { key:'parts',     label:'Parts alerts',           icon:'warn',   viewAllPage:'parts' },
   ];
 
