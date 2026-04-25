@@ -190,6 +190,22 @@ const API = (() => {
     persist();
     return delay({ ok: true });
   }
+  async function updateEquipmentHours(id, hours) {
+    const e = EQUIPMENT.find(x => x.id === id);
+    if (!e) throw new Error('Equipment not found');
+    const n = Number(hours);
+    if (!Number.isFinite(n) || n < 0) throw new Error('Invalid hours value');
+    if (n < e.hours) throw new Error(`New reading cannot be less than current hours (${e.hours})`);
+    e.hours = n;
+    // Sync currentHours on any active jobs for this equipment
+    JOBS.forEach(j => {
+      if (j.entityType !== 'facility' && (j.entityId === id || j.equipId === id) && j.status !== 'completed') {
+        j.currentHours = n;
+      }
+    });
+    persist();
+    return delay({ ok: true, hours: n });
+  }
   async function deleteEquipment(id) {
     const i = EQUIPMENT.findIndex(e => e.id === id);
     if (i < 0) throw new Error('Equipment not found');
@@ -284,6 +300,8 @@ const API = (() => {
       currentHours:data.currentHours != null ? Number(data.currentHours) : null,
       status:      data.status   || 'upcoming',
       priority:    data.priority || 'medium',
+      recurrence:  data.recurrence || 'none',
+      recurrenceHours: data.recurrenceHours != null && data.recurrenceHours !== '' ? Number(data.recurrenceHours) : null,
       location:    data.location,
       started:     data.started  || null,
       checklistId: data.checklistId || null,
@@ -309,7 +327,8 @@ const API = (() => {
       j.equipName  = entity.name;
       j.equipCode  = data.entityType === 'facility' ? entity.type : entity.code;
     }
-    ['type','basis','dueDate','status','priority','location','started','checklistId','notes'].forEach(k => { if (data[k] !== undefined) j[k] = data[k]; });
+    ['type','basis','dueDate','status','priority','recurrence','location','started','checklistId','notes'].forEach(k => { if (data[k] !== undefined) j[k] = data[k]; });
+    if (data.recurrenceHours !== undefined) j.recurrenceHours = data.recurrenceHours != null && data.recurrenceHours !== '' ? Number(data.recurrenceHours) : null;
     if (data.dueHours     !== undefined) j.dueHours     = data.dueHours     != null && data.dueHours     !== '' ? Number(data.dueHours)     : null;
     if (data.currentHours !== undefined) j.currentHours = data.currentHours != null && data.currentHours !== '' ? Number(data.currentHours) : null;
     if (data.estCost      !== undefined) j.estCost      = Number(data.estCost) || 0;
@@ -394,11 +413,47 @@ const API = (() => {
       if (eq) eq.hours = Number(data.meter);
     }
 
-    // 4. Delete the job
+    // 4. If this was a recurring job, auto-schedule the next one.
+    let nextJobId = null;
+    // Time-based recurrence
+    if (j.recurrence && j.recurrence !== 'none' && j.basis === 'time' && j.dueDate) {
+      const addDays = { weekly: 7 }[j.recurrence] || 0;
+      const nextDue = new Date(j.dueDate);
+      if (addDays) {
+        nextDue.setDate(nextDue.getDate() + addDays);
+      } else {
+        const addMonths = { monthly: 1, quarterly: 3, biannual: 6, yearly: 12 }[j.recurrence] || 0;
+        nextDue.setMonth(nextDue.getMonth() + addMonths);
+      }
+      nextJobId = nid('job');
+      JOBS.push({
+        ...j,
+        id: nextJobId,
+        dueDate: nextDue.toISOString().slice(0, 10),
+        status:  'upcoming',
+        started: null,
+        requiredPartIds: [...(j.requiredPartIds || [])],
+      });
+    }
+    // Hour-based recurrence — next dueHours = meter + interval
+    else if (j.recurrenceHours && j.recurrenceHours > 0 && j.basis === 'hour' && data.meter != null) {
+      nextJobId = nid('job');
+      JOBS.push({
+        ...j,
+        id: nextJobId,
+        dueHours:     Number(data.meter) + Number(j.recurrenceHours),
+        currentHours: Number(data.meter),
+        status:       'upcoming',
+        started:      null,
+        requiredPartIds: [...(j.requiredPartIds || [])],
+      });
+    }
+
+    // 5. Delete the completed job
     JOBS.splice(jIdx, 1);
 
     persist();
-    return delay({ ok: true, historyId: h.id }, 200);
+    return delay({ ok: true, historyId: h.id, nextJobId }, 200);
   }
 
   /* ─── History ─── */
@@ -511,7 +566,7 @@ const API = (() => {
     listUsers, createUser, updateUser, deleteUser, resetUserPassword,
     listParts, createPart, updatePart, deletePart,
     listFacilities, createFacility, updateFacility, deleteFacility,
-    listEquipment, createEquipment, updateEquipment, deleteEquipment,
+    listEquipment, createEquipment, updateEquipment, updateEquipmentHours, deleteEquipment,
     addEquipmentPart, updateEquipmentPart, removeEquipmentPart,
     listTemplates, createTemplate, updateTemplate, deleteTemplate,
     listJobs, createJob, updateJob, deleteJob, startJob, revertJob, closeJob,
