@@ -693,6 +693,22 @@ function bindSearchInput(inputId, stateKey) {
   }, 400));
 }
 
+/* bindSortBar — wires sort-pill buttons emitted by renderSortBar(). */
+function bindSortBar(dataAttr, keyState, dirState) {
+  document.querySelectorAll(`[${dataAttr}]`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const newKey = btn.getAttribute(dataAttr);
+      if (S[keyState] === newKey) {
+        S[dirState] = (S[dirState] === 'desc') ? 'asc' : 'desc';
+      } else {
+        S[keyState] = newKey;
+        S[dirState] = 'asc';
+      }
+      render();
+    });
+  });
+}
+
 /* compressImage — resize + re-encode an image File to a data URL.
    - Scales so the longest edge is at most `maxDim` px
    - Saves as JPEG at `quality` (0..1)
