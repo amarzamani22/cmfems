@@ -4,6 +4,23 @@
 
 'use strict';
 
+/* renderSortBar — pill-style sort buttons with direction toggle. */
+function renderSortBar(options, activeKey, dir, dataAttr) {
+  const upArrow   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>';
+  const downArrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  const dualArrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 10 12 4 18 10"/><polyline points="6 14 12 20 18 14"/></svg>';
+  return `
+    <div class="sort-bar">
+      <span class="sort-bar-label">Sort by</span>
+      ${options.map(o => {
+        const active = activeKey === o.key;
+        const arrow  = active ? (dir === 'desc' ? downArrow : upArrow) : dualArrow;
+        return `<button type="button" class="sort-btn ${active ? 'active' : ''}" ${dataAttr}="${o.key}">${o.label} ${arrow}</button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
 /* ═══════════════════════════════════════════════════════════
    LOGIN SCREEN
    ═══════════════════════════════════════════════════════════ */
@@ -306,14 +323,17 @@ function renderEquipmentList() {
   if (S.equipFilters.type !== 'all')     filtered = filtered.filter(e => e.type === S.equipFilters.type);
   if (S.equipFilters.status !== 'all')   filtered = filtered.filter(e => effectiveEquipmentStatus(e) === S.equipFilters.status);
 
-  // Sort — applied after filtering
+  // Sort — applied after filtering. Direction sign flips the comparator for desc.
   const statusOrder = { breakdown: 0, overdue: 1, warning: 2, ok: 3 };
   const sortKey = S.equipSort || 'name';
+  const sortSign = (S.equipSortDir === 'desc') ? -1 : 1;
   filtered = [...filtered].sort((a, b) => {
-    if (sortKey === 'code')   return a.code.localeCompare(b.code);
-    if (sortKey === 'type')   return (a.type || '').localeCompare(b.type || '') || a.name.localeCompare(b.name);
-    if (sortKey === 'status') return (statusOrder[effectiveEquipmentStatus(a)] ?? 9) - (statusOrder[effectiveEquipmentStatus(b)] ?? 9) || a.name.localeCompare(b.name);
-    return a.name.localeCompare(b.name);   // default: by name
+    let cmp;
+    if      (sortKey === 'code')   cmp = a.code.localeCompare(b.code);
+    else if (sortKey === 'type')   cmp = (a.type || '').localeCompare(b.type || '') || a.name.localeCompare(b.name);
+    else if (sortKey === 'status') cmp = (statusOrder[effectiveEquipmentStatus(a)] ?? 9) - (statusOrder[effectiveEquipmentStatus(b)] ?? 9) || a.name.localeCompare(b.name);
+    else                           cmp = a.name.localeCompare(b.name);
+    return cmp * sortSign;
   });
 
   return `
@@ -350,12 +370,20 @@ function renderEquipmentList() {
           <option value="warning" ${S.equipFilters.status==='warning'?'selected':''}>Due soon</option>
           <option value="ok" ${S.equipFilters.status==='ok'?'selected':''}>Serviced</option>
         </select>
-        <select class="filter-select" id="equip-sort" title="Sort">
-          <option value="name"   ${S.equipSort==='name'  ?'selected':''}>Sort: Name</option>
-          <option value="code"   ${S.equipSort==='code'  ?'selected':''}>Sort: Code</option>
-          <option value="type"   ${S.equipSort==='type'  ?'selected':''}>Sort: Type</option>
-          <option value="status" ${S.equipSort==='status'?'selected':''}>Sort: Status (worst first)</option>
-        </select>
+      </div>
+
+      <div class="mb-12">
+        ${renderSortBar(
+          [
+            { key: 'name',   label: 'Name'   },
+            { key: 'code',   label: 'Code'   },
+            { key: 'type',   label: 'Type'   },
+            { key: 'status', label: 'Status' },
+          ],
+          S.equipSort || 'name',
+          S.equipSortDir || 'asc',
+          'data-sort-equip'
+        )}
       </div>
 
       ${filtered.length === 0 ? (EQUIPMENT.length === 0 ? renderEmptyZero({
@@ -436,12 +464,22 @@ function renderEquipCard(e) {
             </div>
           `}
         </div>
-        <button class="btn btn-sm bd-report-btn" style="color:var(--bd-text);border-color:var(--bd-border);background:var(--bd-bg);align-self:flex-end;"
-          data-action="report-breakdown" data-equip="${e.id}"
-          onclick="event.stopPropagation()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Report breakdown
-        </button>
+        <div class="equip-card-actions">
+          ${e.tracksHours ? `
+            <button class="btn btn-sm" style="color:var(--info-text);border-color:var(--info-text);background:var(--info-bg);"
+              data-action="update-hours" data-equip="${e.id}"
+              onclick="event.stopPropagation()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Update hours
+            </button>
+          ` : ''}
+          <button class="btn btn-sm bd-report-btn" style="color:var(--bd-text);border-color:var(--bd-border);background:var(--bd-bg);"
+            data-action="report-breakdown" data-equip="${e.id}"
+            onclick="event.stopPropagation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Report breakdown
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -836,12 +874,15 @@ function renderMaintenance() {
     if (j.basis === 'hour' && j.dueHours != null) return Number.MAX_SAFE_INTEGER - (j.dueHours - (j.currentHours||0));
     return Number.MAX_SAFE_INTEGER;
   };
-  const sortKey = S.maintSort || 'due';
+  const sortKey  = S.maintSort || 'due';
+  const sortSign = (S.maintSortDir === 'desc') ? -1 : 1;
   filtered = [...filtered].sort((a, b) => {
-    if (sortKey === 'priority')  return (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
-    if (sortKey === 'type')      return (a.type || '').localeCompare(b.type || '');
-    if (sortKey === 'equipment') return (a.equipName || '').localeCompare(b.equipName || '');
-    return dueScore(a) - dueScore(b);   // default: earliest due first
+    let cmp;
+    if      (sortKey === 'priority')  cmp = (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
+    else if (sortKey === 'type')      cmp = (a.type || '').localeCompare(b.type || '');
+    else if (sortKey === 'equipment') cmp = (a.equipName || '').localeCompare(b.equipName || '');
+    else                              cmp = dueScore(a) - dueScore(b);
+    return cmp * sortSign;
   });
 
   const isCal = S.maintView === 'calendar';
@@ -889,7 +930,7 @@ function renderMaintenance() {
           </button>
         </div>
 
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;" class="mb-16">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;" class="mb-12">
           <select class="filter-select" id="maint-filter-location">
             <option value="all" ${mf.location==='all'?'selected':''}>All locations</option>
             ${locations.map(l => `<option value="${l}" ${mf.location===l?'selected':''}>${l}</option>`).join('')}
@@ -903,12 +944,20 @@ function renderMaintenance() {
             <option value="time" ${mf.basis==='time'?'selected':''}>Time-based</option>
             <option value="hour" ${mf.basis==='hour'?'selected':''}>Hour-based</option>
           </select>
-          <select class="filter-select" id="maint-sort" title="Sort">
-            <option value="due"       ${(S.maintSort||'due')==='due'       ?'selected':''}>Sort: Due (earliest)</option>
-            <option value="priority"  ${S.maintSort==='priority' ?'selected':''}>Sort: Priority</option>
-            <option value="type"      ${S.maintSort==='type'     ?'selected':''}>Sort: Service type</option>
-            <option value="equipment" ${S.maintSort==='equipment'?'selected':''}>Sort: Equipment name</option>
-          </select>
+        </div>
+
+        <div class="mb-16">
+          ${renderSortBar(
+            [
+              { key: 'due',       label: 'Due'           },
+              { key: 'priority',  label: 'Priority'      },
+              { key: 'type',      label: 'Service type'  },
+              { key: 'equipment', label: 'Equipment'     },
+            ],
+            S.maintSort || 'due',
+            S.maintSortDir || 'asc',
+            'data-sort-maint'
+          )}
         </div>
 
         ${filtered.length === 0 ? `
@@ -1038,6 +1087,8 @@ function renderJob() {
         </div>
       `}
 
+      ${isStarted ? renderProofPhotos() : ''}
+
       ${allDone && isStarted && pstat.blocked === 0 ? `
         <button class="op-big-btn op-big-btn-complete" data-action="complete-job" data-job="${j.id}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" style="width:22px;height:22px"><polyline points="20 6 9 17 4 12"/></svg>
@@ -1049,6 +1100,42 @@ function renderJob() {
           <span>BLOCKED · PARTS MISSING</span>
         </button>
       ` : ''}
+    </div>
+  `;
+}
+
+/* Proof photos block — shown after the job is started. Operator can attach
+   up to 6 photos as evidence. Travels with the close payload to history. */
+function renderProofPhotos() {
+  const photos = S.proofPhotos || [];
+  const MAX = 6;
+  return `
+    <div class="op-proof">
+      <div class="op-proof-hd">
+        <span>Proof photos</span>
+        <span class="op-proof-count">${photos.length} / ${MAX}</span>
+      </div>
+      ${photos.length > 0 ? `
+        <div class="op-proof-grid">
+          ${photos.map((p, idx) => `
+            <div class="op-proof-thumb">
+              <img src="${p}" alt="Proof ${idx + 1}" data-action="view-photo" data-src="${p}" data-label="Proof photo ${idx + 1}">
+              <button class="op-proof-rm" data-action="remove-proof-photo" data-idx="${idx}" title="Remove">×</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div class="op-proof-empty">No photos yet — tap the button to add evidence of the work done.</div>
+      `}
+      ${photos.length < MAX ? `
+        <label class="op-big-btn op-big-btn-photo" for="op-proof-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="width:22px;height:22px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>ADD PHOTO</span>
+        </label>
+        <input id="op-proof-input" type="file" accept="image/*" capture="environment" style="display:none;">
+      ` : `
+        <div class="op-proof-full">Maximum ${MAX} photos reached — remove one to add another.</div>
+      `}
     </div>
   `;
 }
@@ -1190,11 +1277,12 @@ function renderHistMaintenance(list) {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Date</th><th>Asset</th><th>Service</th><th>Duration</th><th>Parts</th><th>Cost</th><th>Technician</th></tr>
+          <tr><th>Date</th><th>Asset</th><th>Service</th><th>Duration</th><th>Parts</th><th>Cost</th><th>Technician</th><th>Photos</th></tr>
         </thead>
         <tbody>
           ${list.map(h => {
             const isFac = h.entityType === 'facility';
+            const photos = Array.isArray(h.proofPhotos) ? h.proofPhotos : [];
             return `
               <tr>
                 <td style="white-space:nowrap;color:var(--text-2);">${fmtDate(h.date)}</td>
@@ -1215,6 +1303,14 @@ function renderHistMaintenance(list) {
                   ${(h.partsCost || h.laborCost || h.miscCost) ? `<div style="font-size:10px;color:var(--text-3);font-weight:400;margin-top:2px;">P ${fmtRM(h.partsCost||0)} · L ${fmtRM(h.laborCost||0)}${h.miscCost ? ' · M ' + fmtRM(h.miscCost) : ''}</div>` : ''}
                 </td>
                 <td style="color:var(--text-2);">${h.tech || '—'}</td>
+                <td style="text-align:center;">
+                  ${photos.length > 0
+                    ? `<button class="btn btn-sm" data-action="view-proof-photos" data-history="${h.id}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--info-text);border-color:var(--info-text);">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                         ${photos.length}
+                       </button>`
+                    : `<span style="color:var(--text-4);font-size:11px;">—</span>`}
+                </td>
               </tr>
             `;
           }).join('')}
@@ -1522,11 +1618,14 @@ function renderFacilities() {
   if (filterType !== 'all')    list = list.filter(f => f.type === filterType);
 
   // Sort
-  const facSortKey = S.facilitySort || 'name';
+  const facSortKey  = S.facilitySort || 'name';
+  const facSortSign = (S.facilitySortDir === 'desc') ? -1 : 1;
   list = [...list].sort((a, b) => {
-    if (facSortKey === 'type')     return (a.type || '').localeCompare(b.type || '') || a.name.localeCompare(b.name);
-    if (facSortKey === 'location') return (a.location || '').localeCompare(b.location || '') || a.name.localeCompare(b.name);
-    return a.name.localeCompare(b.name);
+    let cmp;
+    if      (facSortKey === 'type')     cmp = (a.type || '').localeCompare(b.type || '') || a.name.localeCompare(b.name);
+    else if (facSortKey === 'location') cmp = (a.location || '').localeCompare(b.location || '') || a.name.localeCompare(b.name);
+    else                                cmp = a.name.localeCompare(b.name);
+    return cmp * facSortSign;
   });
 
   const activeCount = FACILITIES.filter(f => f.status === 'active').length;
@@ -1560,11 +1659,19 @@ function renderFacilities() {
           <option value="all" ${filterType==='all'?'selected':''}>All types</option>
           ${FACILITY_TYPES.map(t => `<option value="${t}" ${filterType===t?'selected':''}>${t}</option>`).join('')}
         </select>
-        <select class="filter-select" id="facility-sort" title="Sort">
-          <option value="name"     ${(S.facilitySort||'name')==='name'    ?'selected':''}>Sort: Name</option>
-          <option value="type"     ${S.facilitySort==='type'    ?'selected':''}>Sort: Type</option>
-          <option value="location" ${S.facilitySort==='location'?'selected':''}>Sort: Location</option>
-        </select>
+      </div>
+
+      <div class="mb-12">
+        ${renderSortBar(
+          [
+            { key: 'name',     label: 'Name'     },
+            { key: 'type',     label: 'Type'     },
+            { key: 'location', label: 'Location' },
+          ],
+          S.facilitySort || 'name',
+          S.facilitySortDir || 'asc',
+          'data-sort-facility'
+        )}
       </div>
 
       ${list.length === 0 ? (FACILITIES.length === 0 ? renderEmptyZero({
