@@ -383,6 +383,10 @@ const API = (() => {
     }
 
     // 1. Insert history record
+    // Proof photos: client sends an array of base64 data URLs; cap at 6 to bound storage.
+    const proofPhotos = Array.isArray(data.proofPhotos)
+      ? data.proofPhotos.filter(p => typeof p === 'string').slice(0, 6)
+      : [];
     const h = {
       id: nid('h'),
       entityType: j.entityType,
@@ -397,6 +401,7 @@ const API = (() => {
       parts:      required.length,
       tech:       data.tech,
       notes:      data.notes || null,
+      proofPhotos,
       status:     'completed',
     };
     HISTORY.unshift(h);
