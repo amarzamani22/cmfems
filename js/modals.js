@@ -3731,6 +3731,7 @@ async function handleLogin(email, password) {
     const { user } = await API.login(email, password);
     // Route by role: this is the admin app — operators go to the operator app
     if (user.role !== 'admin') {
+      try { sessionStorage.setItem('fems-just-logged-in', '1'); } catch (e) {}
       window.location.href = 'operator/';
       return;
     }
@@ -3744,7 +3745,7 @@ async function handleLogin(email, password) {
     finally   { hideLoader(); }
     updateSidebarUser();
     render();
-    setTimeout(() => toast(`Welcome, ${user.name.split(' ')[0]}`), 200);
+    setTimeout(() => showWelcomeSplash(user.name.split(' ')[0]), 200);
   } catch (err) {
     if (errEl) { errEl.textContent = err.message || 'Login failed. Check credentials and try again.'; errEl.style.display = 'block'; }
     if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
@@ -3773,6 +3774,7 @@ async function restoreSession() {
     if (user) {
       // Route by role: this is the admin app — operators belong in /operator/
       if (user.role !== 'admin') {
+        try { sessionStorage.setItem('fems-just-logged-in', '1'); } catch (e) {}
         window.location.href = 'operator/';
         return;
       }
@@ -3784,6 +3786,13 @@ async function restoreSession() {
       finally { hideLoader(); }
       updateSidebarUser();
       render();
+      // Show splash only if we just landed here from a cross-app redirect.
+      let justLoggedIn = false;
+      try { justLoggedIn = sessionStorage.getItem('fems-just-logged-in') === '1'; } catch (e) {}
+      if (justLoggedIn) {
+        try { sessionStorage.removeItem('fems-just-logged-in'); } catch (e) {}
+        setTimeout(() => showWelcomeSplash(user.name.split(' ')[0]), 200);
+      }
     }
   } catch (e) {
     // Not logged in, or server unreachable — stay on login screen
