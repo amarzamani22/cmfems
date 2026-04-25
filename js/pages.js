@@ -176,22 +176,22 @@ function renderAdminOverview() {
             ${breakdown > 0 ? '<span class="bd-pulse-dot" style="width:7px;height:7px;"></span>' : ''}
             Breakdown
           </div>
-          <div class="kpi-value" style="color:var(--bd-text);">${breakdown}</div>
+          <div class="kpi-value kpi-counter" data-target="${breakdown}" style="color:var(--bd-text);">${breakdown}</div>
           <div class="kpi-sub">${breakdown===0?'all equipment operational':'out of service'}</div>
         </div>
         <div class="kpi-card kpi-danger card-click" data-nav="maintenance">
           <div class="kpi-label">Overdue service</div>
-          <div class="kpi-value">${overdue}</div>
+          <div class="kpi-value kpi-counter" data-target="${overdue}">${overdue}</div>
           <div class="kpi-sub">${overdue===0?'all caught up':'need service now'}</div>
         </div>
         <div class="kpi-card kpi-warning card-click" data-nav="maintenance">
           <div class="kpi-label">Due this week</div>
-          <div class="kpi-value">${dueWeek}</div>
+          <div class="kpi-value kpi-counter" data-target="${dueWeek}">${dueWeek}</div>
           <div class="kpi-sub">upcoming jobs</div>
         </div>
         <div class="kpi-card ${partsToReorder > 0 ? 'kpi-warning' : 'kpi-info'} card-click admin-only" data-nav="parts">
           <div class="kpi-label">Parts to reorder</div>
-          <div class="kpi-value">${partsToReorder}</div>
+          <div class="kpi-value kpi-counter" data-target="${partsToReorder}">${partsToReorder}</div>
           <div class="kpi-sub">${partsToReorder===0 ? 'stock levels healthy' : `${partsOut} out · ${partsLow} low stock`}</div>
         </div>
       </div>
