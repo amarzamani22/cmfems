@@ -1823,6 +1823,41 @@ function openPhotoLightbox(src, label) {
   };
 }
 
+/* Open the proof-photos viewer for a closed history record. Read-only — admins
+   browse the evidence in a thumbnail grid; tap a thumb to enlarge in the lightbox. */
+function openProofPhotos(historyId) {
+  const h = HISTORY.find(x => x.id === historyId);
+  if (!h) { toast('Record not found', 'error'); return; }
+  const photos = Array.isArray(h.proofPhotos) ? h.proofPhotos : [];
+  document.getElementById('modal-box').style.maxWidth = '720px';
+  openModal(`
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">Proof photos · ${h.equipName}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${h.type} · ${fmtDate(h.date)} · by ${h.tech || '—'}</div>
+      </div>
+      <button class="icon-btn" id="pp-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      ${photos.length === 0
+        ? `<div style="font-size:12px;color:var(--text-3);text-align:center;padding:20px 0;">No proof photos attached to this record.</div>`
+        : `<div class="proof-grid" style="grid-template-columns:repeat(auto-fill,minmax(120px,1fr));">
+             ${photos.map((p, idx) => `
+               <div class="proof-thumb">
+                 <img src="${p}" alt="Proof ${idx + 1}" data-action="view-photo" data-src="${p}" data-label="Proof photo ${idx + 1} · ${h.equipName}">
+               </div>
+             `).join('')}
+           </div>`}
+    </div>
+  `);
+  document.getElementById('pp-close').onclick = () => {
+    closeModal();
+    document.getElementById('modal-box').style.maxWidth = '';
+  };
+}
+
 /* ═══════════════════════════════════════════════════════════
    14b. CLOSE JOB (MARK COMPLETE)
    ═══════════════════════════════════════════════════════════ */
@@ -2007,6 +2042,7 @@ function openCloseJob(jobId) {
         miscCost:  Math.round(misc),
         meter,
         notes: notes || null,
+        proofPhotos: Array.isArray(S.proofPhotos) ? S.proofPhotos : [],
       });
       // Server did: history insert + stock deduction + hours update + job delete (+ next job created if recurring).
       await Promise.all([
@@ -2016,6 +2052,7 @@ function openCloseJob(jobId) {
         refreshEquipment(),
       ]);
       S.checks = {};
+      S.proofPhotos = [];
       closeModal();
       document.getElementById('modal-box').style.maxWidth = '';
       toast(`${e.name} · ${j.type} completed · logged to history`);
@@ -3093,6 +3130,8 @@ function attachHandlers() {
       const job  = el.dataset.job;
       const equip= el.dataset.equip;
       const fac  = el.dataset.facility;
+      // Switching to a different job clears any photos still attached from the previous one.
+      if (job && job !== S.selectedJob) S.proofPhotos = [];
       if (job)   S.selectedJob = job;
       if (equip) S.selectedEquipment = equip;
       if (fac)   S.selectedFacility = fac;
@@ -3111,6 +3150,27 @@ function attachHandlers() {
       render();
     });
   });
+
+  // Proof-photo file input — compress and append to S.proofPhotos. Cap enforced by render.
+  const proofInput = document.getElementById('proof-input');
+  if (proofInput && !proofInput._bound) {
+    proofInput._bound = true;
+    proofInput.addEventListener('change', async e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await compressImage(file, 1280, 0.82);
+        if (!Array.isArray(S.proofPhotos)) S.proofPhotos = [];
+        if (S.proofPhotos.length >= 6) { toast('Max 6 proof photos', 'warning'); return; }
+        S.proofPhotos.push(dataUrl);
+        render();
+      } catch (err) {
+        toast('Could not load that image', 'error');
+      } finally {
+        proofInput.value = '';
+      }
+    });
+  }
 
   // Action buttons
   document.querySelectorAll('[data-action]').forEach(el => {
@@ -3227,6 +3287,14 @@ function attachHandlers() {
         openUpdateHours(el.dataset.equip || S.selectedEquipment);
       } else if (act === 'view-photo') {
         openPhotoLightbox(el.dataset.src, el.dataset.label);
+      } else if (act === 'view-proof-photos') {
+        openProofPhotos(el.dataset.history);
+      } else if (act === 'remove-proof-photo') {
+        const idx = parseInt(el.dataset.idx, 10);
+        if (S.proofPhotos && Number.isInteger(idx)) {
+          S.proofPhotos.splice(idx, 1);
+          render();
+        }
       } else if (act === 'add-equip-part') {
         openAddEquipmentPart(el.dataset.equip || S.selectedEquipment);
       } else if (act === 'edit-equip-part') {
@@ -3340,7 +3408,7 @@ function attachHandlers() {
     });
   });
 
-  // Maintenance secondary filters + sort dropdown
+  // Maintenance secondary filters
   if (!S.maintFilters) S.maintFilters = { location: 'all', type: 'all', basis: 'all' };
   const mLoc   = document.getElementById('maint-filter-location');
   if (mLoc)   mLoc.addEventListener('change',   e => { S.maintFilters.location = e.target.value; render(); });
@@ -3348,8 +3416,9 @@ function attachHandlers() {
   if (mType)  mType.addEventListener('change',  e => { S.maintFilters.type = e.target.value; render(); });
   const mBasis = document.getElementById('maint-filter-basis');
   if (mBasis) mBasis.addEventListener('change', e => { S.maintFilters.basis = e.target.value; render(); });
-  const mSort  = document.getElementById('maint-sort');
-  if (mSort)  mSort.addEventListener('change',  e => { S.maintSort = e.target.value; render(); });
+
+  // Sort-bar buttons (replaces the old sort dropdown)
+  bindSortBar('data-sort-maint', 'maintSort', 'maintSortDir');
 
   // Equipment search & filters
   bindSearchInput('equip-search', 'equipSearch');
@@ -3691,6 +3760,7 @@ async function handleLogout() {
   S.page     = 'overview';
   S.scheduleForm = null;
   S.checks       = {};
+  S.proofPhotos  = [];
   updateSidebarUser();
   render();
   if (name) setTimeout(() => toast(`Signed out · bye ${name}`, 'info'), 200);
