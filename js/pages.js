@@ -73,11 +73,11 @@ function renderOperatorOverview() {
   const overdueJobs  = JOBS.filter(j => effectiveStatus(j) === 'overdue');
   const todayJobs    = JOBS.filter(j => j.dueDate === today && effectiveStatus(j) !== 'completed' && effectiveStatus(j) !== 'overdue');
   const inprogJobs   = JOBS.filter(j => j.status === 'inprogress');
+  // Coming-up = time-based due in next 7 days OR hour-based meter within threshold.
   const weekJobs     = JOBS.filter(j => {
-    if (effectiveStatus(j) !== 'upcoming') return false;
-    if (!j.dueDate || j.dueDate === today) return false;
-    const diff = Math.round((new Date(j.dueDate) - new Date()) / 86400000);
-    return diff > 0 && diff <= 7;
+    if (!isJobDueSoon(j)) return false;
+    if (j.basis === 'time' && j.dueDate === today) return false;
+    return true;
   });
 
   const closedToday = HISTORY.filter(h => h.date === today).length;
@@ -97,7 +97,7 @@ function renderOperatorOverview() {
     let dueTxt = '';
     if (j.basis === 'hour') {
       const diff = j.currentHours - j.dueHours;
-      dueTxt = diff > 0 ? `Overdue ${diff} hrs` : `Due in ${-diff} hrs`;
+      dueTxt = diff > 0 ? `Overdue ${diff} hrs` : diff === 0 ? 'Due now' : `Due in ${-diff} hrs`;
     } else if (j.dueDate) {
       const diff = Math.round((new Date(j.dueDate) - new Date()) / 86400000);
       dueTxt = diff < 0 ? `Overdue ${-diff}d` : diff === 0 ? 'Due today' : `In ${diff}d`;
@@ -196,7 +196,7 @@ function renderOperatorOverview() {
       ${weekJobs.length > 0 ? `
         <div class="op-section">
           <div class="op-section-hd">
-            <span>This week</span>
+            <span>Coming up</span>
             <span class="op-count">${weekJobs.length}</span>
           </div>
           <div class="op-list">${weekJobs.slice(0, 5).map(renderJobRow).join('')}</div>
@@ -208,7 +208,7 @@ function renderOperatorOverview() {
         <div class="op-allclear">
           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:48px;height:48px;opacity:0.5;"><polyline points="20 6 9 17 4 12"/></svg>
           <div class="op-allclear-title">All caught up</div>
-          <div class="op-allclear-sub">No overdue jobs, no breakdowns, no work scheduled this week.</div>
+          <div class="op-allclear-sub">No overdue jobs, no breakdowns, nothing coming up.</div>
         </div>
       ` : ''}
 
@@ -520,7 +520,7 @@ function renderJobCard(j) {
   let dueText = '';
   if (j.basis === 'hour') {
     const diff = j.currentHours - j.dueHours;
-    dueText = diff > 0 ? `Overdue ${diff} hrs` : `Due in ${-diff} hrs`;
+    dueText = diff > 0 ? `Overdue ${diff} hrs` : diff === 0 ? 'Due now' : `Due in ${-diff} hrs`;
   } else if (j.dueDate) {
     const diff = Math.round((new Date(j.dueDate) - new Date()) / 86400000);
     dueText = diff < 0 ? `Overdue ${-diff} day${diff<-1?'s':''}` : diff === 0 ? 'Due today' : `Due in ${diff} day${diff>1?'s':''}`;
@@ -560,6 +560,7 @@ function renderJobCard(j) {
           ${pill(j.type, 'info')}
           ${pill(dueText, color)}
           ${eStatus === 'inprogress' ? pill('In progress','info') : ''}
+          ${(j.recurrence && j.recurrence !== 'none') ? pill(`🔄 ${RECURRENCE_LABELS[j.recurrence] || j.recurrence}`, 'neutral') : (j.recurrenceHours && j.recurrenceHours > 0) ? pill(`🔄 Every ${j.recurrenceHours.toLocaleString()} hrs`, 'neutral') : ''}
           ${(() => {
             const ps = jobPartsSummary(j);
             if (ps.blocked > 0) return pill(`⚠ ${ps.blocked} part${ps.blocked>1?'s':''} missing`, 'danger');
@@ -683,7 +684,9 @@ function renderEquipCard(e) {
         </div>
         <div class="equip-card-body">
           <div class="equip-stat-row"><span class="equip-stat-label">Make & model</span><span class="equip-stat-val">${e.make} ${e.model}</span></div>
-          <div class="equip-stat-row"><span class="equip-stat-label">Operating hrs</span><span class="equip-stat-val">${e.hours.toLocaleString()} hrs</span></div>
+          ${e.tracksHours
+            ? `<div class="equip-stat-row"><span class="equip-stat-label">Operating hrs</span><span class="equip-stat-val">${e.hours.toLocaleString()} hrs</span></div>`
+            : `<div class="equip-stat-row"><span class="equip-stat-label">Scheduling</span><span class="equip-stat-val">Calendar time</span></div>`}
 
           ${isBd && activeBd ? `
             <div style="margin-top:8px;background:var(--bd-bg);border-radius:var(--r-sm);padding:8px;">
@@ -753,9 +756,14 @@ function renderEquipmentDetail() {
             ${isBd ? '<span class="bd-pulse-dot"></span>' : ''}
             ${pill(label, color)}
           </div>
-          <div class="page-sub">${e.make} ${e.model} · ${e.fuel} · ${e.location} · ${e.hours.toLocaleString()} op hrs</div>
+          <div class="page-sub">${e.make} ${e.model} · ${e.fuel} · ${e.location}${e.tracksHours ? ` · ${e.hours.toLocaleString()} op hrs` : ' · calendar-time scheduling'}</div>
         </div>
         <div class="page-hd-right">
+          ${e.tracksHours ? `
+          <button class="btn" data-action="update-hours" data-equip="${e.id}" style="color:var(--info-text);border-color:var(--info-text);background:var(--info-bg);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Update hours
+          </button>` : ''}
           <button class="btn bd-report-btn" data-action="report-breakdown" data-equip="${e.id}" style="color:var(--bd-text);border-color:var(--bd-border);">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:13px;height:13px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             Report breakdown
@@ -769,12 +777,17 @@ function renderEquipmentDetail() {
 
       ${activeBd ? `
         <div class="bd-active-banner mb-16" style="padding:14px 16px;">
-          <div>
+          <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
               <span class="bd-pulse-dot"></span>
               <strong style="font-size:13px;">Active breakdown — equipment out of service</strong>
             </div>
             <div style="font-size:12px;opacity:0.9;line-height:1.5;margin-bottom:8px;">${activeBd.description}</div>
+            ${activeBd.photo ? `
+              <img src="${activeBd.photo}" alt="Breakdown photo"
+                data-action="view-photo" data-src="${activeBd.photo}" data-label="Breakdown · ${e.name}"
+                style="display:block;max-width:240px;width:100%;max-height:160px;object-fit:cover;border-radius:var(--r-md);cursor:zoom-in;margin-bottom:8px;">
+            ` : ''}
             <div style="display:flex;gap:10px;font-size:11px;opacity:0.8;flex-wrap:wrap;">
               <span>Reported by <strong>${activeBd.reportedBy}</strong></span>
               <span>·</span>
@@ -803,7 +816,8 @@ function renderEquipmentDetail() {
               <div class="spec-item"><div class="spec-label">Location</div><div class="spec-val">${e.location}</div></div>
               <div class="spec-item"><div class="spec-label">Type</div><div class="spec-val">${e.type}</div></div>
               <div class="spec-item"><div class="spec-label">Date of purchase</div><div class="spec-val">${fmtDate(e.purchase)}</div></div>
-              <div class="spec-item"><div class="spec-label">Operating hours</div><div class="spec-val">${e.hours.toLocaleString()} hrs</div></div>
+              <div class="spec-item"><div class="spec-label">Scheduling</div><div class="spec-val">${e.tracksHours ? 'Operating hours' : 'Calendar time'}</div></div>
+              ${e.tracksHours ? `<div class="spec-item"><div class="spec-label">Operating hours</div><div class="spec-val">${e.hours.toLocaleString()} hrs</div></div>` : ''}
             </div>
           </div>
 
@@ -1074,9 +1088,31 @@ function renderMaintenance() {
   const overdue  = all.filter(j => effectiveStatus(j) === 'overdue');
   const upcoming = all.filter(j => effectiveStatus(j) === 'upcoming');
   const inprog   = all.filter(j => effectiveStatus(j) === 'inprogress');
-  const filtered = S.maintFilter === 'all' ? all :
+  let filtered  = S.maintFilter === 'all' ? all :
                    S.maintFilter === 'overdue' ? overdue :
                    S.maintFilter === 'upcoming' ? upcoming : inprog;
+
+  const mf = S.maintFilters || { location: 'all', type: 'all', basis: 'all' };
+  if (mf.location !== 'all') filtered = filtered.filter(j => j.location === mf.location);
+  if (mf.type     !== 'all') filtered = filtered.filter(j => j.type === mf.type);
+  if (mf.basis    !== 'all') filtered = filtered.filter(j => (j.basis || 'time') === mf.basis);
+
+  const locations = [...new Set(all.map(j => j.location).filter(Boolean))].sort();
+  const types     = [...new Set(all.map(j => j.type).filter(Boolean))].sort();
+
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const dueScore = (j) => {
+    if (j.basis === 'time' && j.dueDate) return new Date(j.dueDate).getTime();
+    if (j.basis === 'hour' && j.dueHours != null) return Number.MAX_SAFE_INTEGER - (j.dueHours - (j.currentHours||0));
+    return Number.MAX_SAFE_INTEGER;
+  };
+  const sortKey = S.maintSort || 'due';
+  filtered = [...filtered].sort((a, b) => {
+    if (sortKey === 'priority')  return (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
+    if (sortKey === 'type')      return (a.type || '').localeCompare(b.type || '');
+    if (sortKey === 'equipment') return (a.equipName || '').localeCompare(b.equipName || '');
+    return dueScore(a) - dueScore(b);
+  });
 
   const isCal = S.maintView === 'calendar';
 
@@ -1108,7 +1144,7 @@ function renderMaintenance() {
       ${isCal ? `
         ${renderCalendar(buildMaintEvents(JOBS, HISTORY, BREAKDOWNS), S.calMonth)}
       ` : `
-        <div class="filter-tabs mb-16">
+        <div class="filter-tabs mb-12">
           <button class="filter-tab ${S.maintFilter==='all'?'active':''}" data-mfilter="all">
             All <span class="fc fc-neutral">${all.length}</span>
           </button>
@@ -1123,11 +1159,33 @@ function renderMaintenance() {
           </button>
         </div>
 
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;" class="mb-16">
+          <select class="filter-select" id="maint-filter-location">
+            <option value="all" ${mf.location==='all'?'selected':''}>All locations</option>
+            ${locations.map(l => `<option value="${l}" ${mf.location===l?'selected':''}>${l}</option>`).join('')}
+          </select>
+          <select class="filter-select" id="maint-filter-type">
+            <option value="all" ${mf.type==='all'?'selected':''}>All service types</option>
+            ${types.map(t => `<option value="${t}" ${mf.type===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <select class="filter-select" id="maint-filter-basis">
+            <option value="all"  ${mf.basis==='all' ?'selected':''}>All triggers</option>
+            <option value="time" ${mf.basis==='time'?'selected':''}>Time-based</option>
+            <option value="hour" ${mf.basis==='hour'?'selected':''}>Hour-based</option>
+          </select>
+          <select class="filter-select" id="maint-sort" title="Sort">
+            <option value="due"       ${(S.maintSort||'due')==='due'       ?'selected':''}>Sort: Due (earliest)</option>
+            <option value="priority"  ${S.maintSort==='priority' ?'selected':''}>Sort: Priority</option>
+            <option value="type"      ${S.maintSort==='type'     ?'selected':''}>Sort: Service type</option>
+            <option value="equipment" ${S.maintSort==='equipment'?'selected':''}>Sort: Equipment name</option>
+          </select>
+        </div>
+
         ${filtered.length === 0 ? `
           <div class="empty-state">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" style="width:36px;height:36px;opacity:0.4;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
             <div class="empty-state-title">All clear</div>
-            <div class="empty-state-sub">No jobs in this category</div>
+            <div class="empty-state-sub">No jobs match the current filters</div>
           </div>
         ` : `
           <div style="display:flex;flex-direction:column;gap:8px;">
@@ -1155,6 +1213,7 @@ function renderJob() {
   const allDone = items.length > 0 && done === items.length;
 
   const pstat = isFac ? { parts: [], blocked: 0, low: 0, total: 0 } : jobPartsSummary(j);
+  const isStarted = j.status === 'inprogress';
 
   return `
     <div>
@@ -1215,15 +1274,29 @@ function renderJob() {
         </div>
       ` : ''}
 
-      <div class="card mb-12" style="${allDone ? 'background:var(--ok-bg);border-color:var(--ok-border)' : ''}">
+      ${!isStarted && items.length > 0 ? `
+        <div class="alert-banner alert-info mb-12" style="display:flex;align-items:center;gap:10px;padding:12px 14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:18px;height:18px;flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:2px;">Job not started yet</div>
+            <div style="font-size:12px;opacity:0.9;">Press <strong>Start job</strong> above to begin — the checklist and completion step unlock once work begins.</div>
+          </div>
+          <button class="btn" data-action="start-job" data-job="${j.id}" style="background:var(--info-text);border-color:var(--info-text);color:white;font-weight:600;white-space:nowrap;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="currentColor" style="width:11px;height:11px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start job
+          </button>
+        </div>
+      ` : ''}
+
+      <div class="card mb-12" style="${allDone && isStarted ? 'background:var(--ok-bg);border-color:var(--ok-border)' : ''}">
         <div class="flex-between mb-8">
-          <span style="font-size:12px;font-weight:500;color:${allDone?'var(--ok-text)':'var(--text-2)'}">
-            ${allDone ? '✓ All checks complete · Semua pemeriksaan selesai' : 'Progress'}
+          <span style="font-size:12px;font-weight:500;color:${allDone && isStarted ?'var(--ok-text)':'var(--text-2)'}">
+            ${allDone && isStarted ? '✓ All checks complete · Semua pemeriksaan selesai' : 'Progress'}
           </span>
           <span style="font-size:13px;font-weight:600;">${done} / ${items.length} · ${pct}%</span>
         </div>
         <div class="progress">
-          <div class="progress-fill" style="width:${pct}%;background:${allDone?'var(--ok-text)':'var(--accent)'};transition:width 0.5s;"></div>
+          <div class="progress-fill" style="width:${pct}%;background:${allDone && isStarted ?'var(--ok-text)':'var(--accent)'};transition:width 0.5s;"></div>
         </div>
       </div>
 
@@ -1240,9 +1313,11 @@ function renderJob() {
                 <div>No checklist template attached to this job.${S.role === 'admin' ? ` Technician will need to use a custom checklist, or <a href="#" data-nav="maintenance" style="color:inherit;font-weight:600;">re-schedule with a template →</a>` : ' Please proceed using a manual inspection — notify an administrator if a checklist template is needed.'}</div>
               </div>
             ` : items.map(i => `
-              <div class="cl-item ${S.checks[i.id] ? 'done' : ''}" data-check="${i.id}">
-                <div class="cl-check ${S.checks[i.id] ? 'checked' : ''}">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <div class="cl-item ${S.checks[i.id] && isStarted ? 'done' : ''} ${!isStarted ? 'cl-item-locked' : ''}" ${isStarted ? `data-check="${i.id}"` : ''} ${!isStarted ? 'title="Press Start job first to enable the checklist"' : ''}>
+                <div class="cl-check ${S.checks[i.id] && isStarted ? 'checked' : ''}">
+                  ${!isStarted
+                    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px;opacity:0.4;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`}
                 </div>
                 <div class="cl-text">
                   <div class="cl-bm">${i.bm}</div>
@@ -1301,11 +1376,14 @@ function renderJob() {
               <div class="flex-between"><span class="text-3">Service type</span><span>${j.type}</span></div>
               <div class="flex-between"><span class="text-3">Trigger basis</span><span>${j.basis === 'hour' ? 'Hour-based' : 'Time-based'}</span></div>
               <div class="flex-between"><span class="text-3">Due</span><span>${j.basis==='hour' ? (j.dueHours||0).toLocaleString()+' hrs' : fmtDate(j.dueDate)}</span></div>
+              <div class="flex-between"><span class="text-3">Recurrence</span><span>${j.basis === 'hour'
+                ? (j.recurrenceHours && j.recurrenceHours > 0 ? `Every ${j.recurrenceHours.toLocaleString()} hrs` : 'One-off')
+                : RECURRENCE_LABELS[j.recurrence || 'none']}</span></div>
               <div class="flex-between"><span class="text-3">Est. cost</span><span style="font-weight:500;">${fmtRM(j.estCost)}</span></div>
             </div>
           </div>
 
-          ${allDone ? (pstat.blocked > 0 ? `
+          ${allDone && isStarted ? (pstat.blocked > 0 ? `
             <div class="card" style="background:var(--danger-bg);border-color:var(--danger-border);">
               <div class="flex-between">
                 <div>
@@ -1427,11 +1505,13 @@ function renderSchedule() {
                 ${isFacility ? `
                   <input class="input" value="Time-based" disabled style="opacity:0.7;">
                   <div class="field-hint">Facilities are always scheduled by date.</div>
+                ` : !e ? `
+                  <input class="input" value="Select equipment first" disabled style="opacity:0.7;">
                 ` : `
-                  <select class="input" data-sched-field="basis">
-                    <option value="time" ${sf.basis==='time'?'selected':''}>Time-based</option>
-                    <option value="hour" ${sf.basis==='hour'?'selected':''}>Hour-based</option>
-                  </select>
+                  <input class="input" value="${e.tracksHours ? 'Hour-based' : 'Time-based'}" disabled style="opacity:0.7;">
+                  <div class="field-hint">${e.tracksHours
+                    ? 'This equipment uses operating-hours scheduling — set on the equipment record.'
+                    : 'This equipment uses calendar-time scheduling — set on the equipment record.'}</div>
                 `}
               </div>
               ${sf.basis === 'time' ? `
@@ -1462,6 +1542,20 @@ function renderSchedule() {
                 <select class="input" data-sched-field="checklistId">
                   ${checklistOptions.map(c => `<option value="${c.id}" ${c.id===sf.checklistId?'selected':''}>${c.label}</option>`).join('')}
                 </select>
+              </div>
+              <div class="field span-2">
+                <label class="field-label">Recurrence</label>
+                ${sf.basis === 'hour' ? `
+                  <select class="input" data-sched-field="recurrenceHours">
+                    ${RECURRENCE_HOUR_OPTIONS.map(o => `<option value="${o.value}" ${Number(sf.recurrenceHours||0)===o.value?'selected':''}>${o.label}</option>`).join('')}
+                  </select>
+                  <div class="field-hint">When this job is closed, the next one will auto-schedule at (closing meter reading) + interval.</div>
+                ` : `
+                  <select class="input" data-sched-field="recurrence">
+                    ${Object.entries(RECURRENCE_LABELS).map(([v, lbl]) => `<option value="${v}" ${(sf.recurrence||'none')===v?'selected':''}>${lbl}</option>`).join('')}
+                  </select>
+                  <div class="field-hint">When this job is closed, the next one will auto-schedule for the chosen interval.</div>
+                `}
               </div>
             </div>
           </div>
