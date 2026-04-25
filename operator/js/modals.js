@@ -3638,6 +3638,7 @@ async function handleLogin(email, password) {
     const { user } = await API.login(email, password);
     // Route by role: this is the operator app — admins go to the admin app at root
     if (user.role === 'admin') {
+      try { sessionStorage.setItem('fems-just-logged-in', '1'); } catch (e) {}
       window.location.href = '../';
       return;
     }
@@ -3646,12 +3647,12 @@ async function handleLogin(email, password) {
     S.role     = user.role;
     S.page     = 'overview';
     if (errEl) errEl.style.display = 'none';
-    showLoader(`Welcome, ${user.name.split(' ')[0]} — loading your data…`);
+    showLoader(`Welcome, Operator — loading your data…`);
     try       { await loadAllData(); }
     finally   { hideLoader(); }
     updateSidebarUser();
     render();
-    setTimeout(() => toast(`Welcome, ${user.name.split(' ')[0]}`), 200);
+    setTimeout(() => showWelcomeSplash('Operator'), 200);
   } catch (err) {
     if (errEl) { errEl.textContent = err.message || 'Login failed. Check credentials and try again.'; errEl.style.display = 'block'; }
     if (btn) { btn.disabled = false; btn.textContent = 'Sign in'; }
@@ -3680,6 +3681,7 @@ async function restoreSession() {
     if (user) {
       // Route by role: this is the operator app — admins belong at root
       if (user.role === 'admin') {
+        try { sessionStorage.setItem('fems-just-logged-in', '1'); } catch (e) {}
         window.location.href = '../';
         return;
       }
@@ -3691,6 +3693,13 @@ async function restoreSession() {
       finally { hideLoader(); }
       updateSidebarUser();
       render();
+      // Show splash only if we just landed here from a cross-app redirect.
+      let justLoggedIn = false;
+      try { justLoggedIn = sessionStorage.getItem('fems-just-logged-in') === '1'; } catch (e) {}
+      if (justLoggedIn) {
+        try { sessionStorage.removeItem('fems-just-logged-in'); } catch (e) {}
+        setTimeout(() => showWelcomeSplash('Operator'), 200);
+      }
     }
   } catch (e) {
     // Not logged in, or server unreachable — stay on login screen
