@@ -9,15 +9,15 @@
    ═══════════════════════════════════════════════════════════ */
 
 const EQUIPMENT = [
-  { id:'fl-001', name:'Forklift 1',         code:'FL-001',  type:'Forklift',    location:'Seremban Store', make:'Toyota',  model:'02-FDE35',  fuel:'Diesel', capacity:'3.5 ton', engine:'1DZ-II',        purchase:'2018-06-15', hours:4521, status:'warning',  img:null },
-  { id:'fl-002', name:'Forklift 2',         code:'FL-002',  type:'Forklift',    location:'AATF 1',         make:'Toyota',  model:'02-FDE35',  fuel:'Diesel', capacity:'3.5 ton', engine:'1DZ-II',        purchase:'2019-03-10', hours:3820, status:'ok',       img:null },
-  { id:'fl-003', name:'Forklift 3',         code:'FL-003',  type:'Forklift',    location:'AATF 1',         make:'Nissan',  model:'F04D45',    fuel:'Diesel', capacity:'4.5 ton', engine:'FD46T',         purchase:'2017-11-20', hours:6201, status:'breakdown',img:null },
-  { id:'fl-004', name:'Forklift 4',         code:'FL-004',  type:'Forklift',    location:'HQ',             make:'Toyota',  model:'02-7FD15',  fuel:'Diesel', capacity:'1.5 ton', engine:'1FZ-E',         purchase:'2020-08-05', hours:2890, status:'overdue',  img:null },
-  { id:'fl-005', name:'Forklift 5',         code:'FL-005',  type:'Forklift',    location:'AATF 2',         make:'Komatsu', model:'FD20-14',   fuel:'Diesel', capacity:'2.0 ton', engine:'4D94E',         purchase:'2021-02-14', hours:1540, status:'ok',       img:null },
-  { id:'fl-006', name:'Forklift 6',         code:'FL-006',  type:'Forklift',    location:'HQ',             make:'Komatsu', model:'FD30-11',   fuel:'Diesel', capacity:'3.0 ton', engine:'4D94LE',        purchase:'2019-07-22', hours:3105, status:'ok',       img:null },
-  { id:'mag-001',name:'Excavator 1',        code:'MAG-001', type:'Excavator',   location:'HQ',             make:'Kobelco', model:'SK200-8',   fuel:'Diesel', capacity:'20 ton',  engine:'Hino J05E',     purchase:'2019-03-15', hours:3284, status:'overdue',  img:null },
-  { id:'mag-002',name:'Excavator 2',        code:'NIB-002', type:'Excavator',   location:'AATF 1',         make:'Sunward', model:'SWE210E',   fuel:'Diesel', capacity:'21 ton',  engine:'Yuchai YC6J',   purchase:'2022-01-08', hours:1820, status:'ok',       img:null },
-  { id:'ssl-001',name:'Skid Steer Loader',  code:'SSL-001', type:'Skid Steer',  location:'HQ',             make:'TCM',     model:'FD45T3',    fuel:'Diesel', capacity:'4.5 ton', engine:'Nissan TD27',   purchase:'2018-09-30', hours:5102, status:'warning',  img:null },
+  { id:'fl-001', name:'Forklift 1',         code:'FL-001',  type:'Forklift',    location:'Seremban Store', make:'Toyota',  model:'02-FDE35',  fuel:'Diesel', capacity:'3.5 ton', engine:'1DZ-II',        purchase:'2018-06-15', hours:4521, tracksHours:true, status:'warning',  img:null },
+  { id:'fl-002', name:'Forklift 2',         code:'FL-002',  type:'Forklift',    location:'AATF 1',         make:'Toyota',  model:'02-FDE35',  fuel:'Diesel', capacity:'3.5 ton', engine:'1DZ-II',        purchase:'2019-03-10', hours:3820, tracksHours:true, status:'ok',       img:null },
+  { id:'fl-003', name:'Forklift 3',         code:'FL-003',  type:'Forklift',    location:'AATF 1',         make:'Nissan',  model:'F04D45',    fuel:'Diesel', capacity:'4.5 ton', engine:'FD46T',         purchase:'2017-11-20', hours:6201, tracksHours:true, status:'breakdown',img:null },
+  { id:'fl-004', name:'Forklift 4',         code:'FL-004',  type:'Forklift',    location:'HQ',             make:'Toyota',  model:'02-7FD15',  fuel:'Diesel', capacity:'1.5 ton', engine:'1FZ-E',         purchase:'2020-08-05', hours:2890, tracksHours:true, status:'overdue',  img:null },
+  { id:'fl-005', name:'Forklift 5',         code:'FL-005',  type:'Forklift',    location:'AATF 2',         make:'Komatsu', model:'FD20-14',   fuel:'Diesel', capacity:'2.0 ton', engine:'4D94E',         purchase:'2021-02-14', hours:1540, tracksHours:true, status:'ok',       img:null },
+  { id:'fl-006', name:'Forklift 6',         code:'FL-006',  type:'Forklift',    location:'HQ',             make:'Komatsu', model:'FD30-11',   fuel:'Diesel', capacity:'3.0 ton', engine:'4D94LE',        purchase:'2019-07-22', hours:3105, tracksHours:true, status:'ok',       img:null },
+  { id:'mag-001',name:'Excavator 1',        code:'MAG-001', type:'Excavator',   location:'HQ',             make:'Kobelco', model:'SK200-8',   fuel:'Diesel', capacity:'20 ton',  engine:'Hino J05E',     purchase:'2019-03-15', hours:3284, tracksHours:true, status:'overdue',  img:null },
+  { id:'mag-002',name:'Excavator 2',        code:'NIB-002', type:'Excavator',   location:'AATF 1',         make:'Sunward', model:'SWE210E',   fuel:'Diesel', capacity:'21 ton',  engine:'Yuchai YC6J',   purchase:'2022-01-08', hours:1820, tracksHours:true, status:'ok',       img:null },
+  { id:'ssl-001',name:'Skid Steer Loader',  code:'SSL-001', type:'Skid Steer',  location:'HQ',             make:'TCM',     model:'FD45T3',    fuel:'Diesel', capacity:'4.5 ton', engine:'Nissan TD27',   purchase:'2018-09-30', hours:5102, tracksHours:true, status:'warning',  img:null },
 ];
 
 const FUEL_ENTRIES = [
@@ -420,6 +420,8 @@ const S = {
   equipSearch: '',
   equipFilters: { location: 'all', type: 'all', status: 'all' },
   maintFilter: 'all',
+  maintFilters: { location: 'all', type: 'all', basis: 'all' },
+  maintSort: 'due',
   histSearch: '',
   historyTab: 'maintenance',      // 'maintenance' | 'breakdowns' | 'fuel'
   historyPeriod: '3m',            // 'all' | '1w' | '1m' | '3m' | '1y'
@@ -467,8 +469,31 @@ function freshScheduleForm() {
     customType: '',
     notes: '',
     requiredPartIds: [],
+    recurrence: 'none',       // for time-based
+    recurrenceHours: 0,       // for hour-based (0 = one-off)
   };
 }
+
+/* Human-friendly labels for the recurrence values */
+const RECURRENCE_LABELS = {
+  none:      'One-off (no repeat)',
+  weekly:    'Weekly',
+  monthly:   'Monthly',
+  quarterly: 'Every 3 months',
+  biannual:  'Every 6 months',
+  yearly:    'Yearly',
+};
+
+/* Preset hour intervals for hour-based recurrence */
+const RECURRENCE_HOUR_OPTIONS = [
+  { value: 0,     label: 'One-off (no repeat)' },
+  { value: 250,   label: 'Every 250 hrs' },
+  { value: 500,   label: 'Every 500 hrs' },
+  { value: 1000,  label: 'Every 1,000 hrs' },
+  { value: 2500,  label: 'Every 2,500 hrs' },
+  { value: 5000,  label: 'Every 5,000 hrs' },
+  { value: 10000, label: 'Every 10,000 hrs' },
+];
 
 function defaultRequiredPartsFor(equipId, type) {
   if (!equipId) return [];
