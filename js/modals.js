@@ -1683,8 +1683,27 @@ function renderEditEquipmentModal(e) {
           </select>
         </div>
         <div class="field"><label class="field-label">Capacity</label><input class="input ee-input" data-field="capacity" value="${e.capacity}"></div>
-        <div class="field"><label class="field-label">Operating hours</label><input class="input ee-input" data-field="hours" type="number" value="${e.hours}"></div>
+        ${e.tracksHours ? `<div class="field"><label class="field-label">Operating hours</label><input class="input ee-input" data-field="hours" type="number" value="${e.hours}"></div>` : ''}
         <div class="field"><label class="field-label">Date of purchase</label><input class="input ee-input" data-field="purchase" type="date" value="${e.purchase || ''}"></div>
+        <div class="field span-2">
+          <label class="field-label">Maintenance scheduling</label>
+          <div class="ae-basis-toggle">
+            <label class="ae-basis-opt ${e.tracksHours ? 'on' : ''}">
+              <input type="radio" name="ee-basis" value="hour" ${e.tracksHours ? 'checked' : ''}>
+              <div>
+                <div class="ae-basis-title">Operating hours</div>
+                <div class="ae-basis-sub">Service every N running hours</div>
+              </div>
+            </label>
+            <label class="ae-basis-opt ${!e.tracksHours ? 'on' : ''}">
+              <input type="radio" name="ee-basis" value="time" ${!e.tracksHours ? 'checked' : ''}>
+              <div>
+                <div class="ae-basis-title">Calendar time</div>
+                <div class="ae-basis-sub">Service weekly, monthly, yearly</div>
+              </div>
+            </label>
+          </div>
+        </div>
       </div>
 
       <div class="sep"></div>
@@ -1718,6 +1737,21 @@ function renderEditEquipmentModal(e) {
   document.getElementById('close-modal').onclick     = closeModal;
   document.getElementById('close-modal-btn').onclick = closeModal;
 
+  // Maintenance scheduling radio — re-renders so the hours field appears/disappears.
+  document.querySelectorAll('input[name="ee-basis"]').forEach(r => {
+    r.addEventListener('change', () => {
+      const next = { ...e, tracksHours: (r.value === 'hour') };
+      document.querySelectorAll('.ee-input').forEach(inp => {
+        const f = inp.dataset.field;
+        if (!f) return;
+        if (f === 'hours') next.hours = parseInt(inp.value) || 0;
+        else if (f === 'purchase') next.purchase = inp.value || null;
+        else next[f] = inp.value;
+      });
+      renderEditEquipmentModal(next);
+    });
+  });
+
   document.querySelectorAll('.ee-photo-box').forEach(box => {
     box.addEventListener('click', () => box.querySelector('.ee-photo-input').click());
     box.querySelector('.ee-photo-input').addEventListener('change', ev => {
@@ -1731,7 +1765,12 @@ function renderEditEquipmentModal(e) {
   });
 
   document.getElementById('ee-save-btn').onclick = async () => {
-    const get = (f) => document.querySelector(`.ee-input[data-field="${f}"]`).value;
+    const get = (f) => {
+      const el = document.querySelector(`.ee-input[data-field="${f}"]`);
+      return el ? el.value : '';
+    };
+    const checked = document.querySelector('input[name="ee-basis"]:checked');
+    const tracksHours = checked ? checked.value === 'hour' : !!e.tracksHours;
     const payload = {
       name:     get('name').trim(),
       code:     get('code').trim().toUpperCase(),
@@ -1742,7 +1781,8 @@ function renderEditEquipmentModal(e) {
       engine:   get('engine').trim(),
       fuel:     get('fuel'),
       capacity: get('capacity').trim(),
-      hours:    parseInt(get('hours')) || 0,
+      hours:        tracksHours ? (parseInt(get('hours')) || 0) : 0,
+      tracksHours,
       purchase: get('purchase') || null,
       photos:   { ...S.editEquipPhotos },
     };
@@ -1839,7 +1879,7 @@ function openCloseJob(jobId) {
         </div>
       </div>
 
-      ${isFac ? '' : j.basis === 'hour' ? `
+      ${isFac || !e.tracksHours ? '' : j.basis === 'hour' ? `
         <div class="field">
           <label class="field-label">Meter reading (op. hrs) <span class="req">*</span></label>
           <input class="input" type="number" id="cj-meter" value="${e.hours}" min="${e.hours}" step="1">
@@ -1961,15 +2001,14 @@ function openCloseJob(jobId) {
     const btn = document.getElementById('cj-confirm');
     btn.disabled = true; btn.textContent = 'Closing…';
     try {
-      await API.closeJob(j.id, {
+      const result = await API.closeJob(j.id, {
         tech, date, duration,
         laborCost: Math.round(labor),
         miscCost:  Math.round(misc),
         meter,
         notes: notes || null,
       });
-      // Server did: history insert + stock deduction + hours update + job delete — all atomic.
-      // Pull fresh data for everything that changed.
+      // Server did: history insert + stock deduction + hours update + job delete (+ next job created if recurring).
       await Promise.all([
         refreshJobs(),
         refreshHistory(),
@@ -1980,6 +2019,11 @@ function openCloseJob(jobId) {
       closeModal();
       document.getElementById('modal-box').style.maxWidth = '';
       toast(`${e.name} · ${j.type} completed · logged to history`);
+      // If the job was recurring, surface the next auto-scheduled job
+      if (result && result.nextJobId) {
+        const recurLabel = (typeof RECURRENCE_LABELS !== 'undefined' && RECURRENCE_LABELS[j.recurrence]) || 'next cycle';
+        setTimeout(() => toast(`🔄 Next ${j.type} auto-scheduled (${recurLabel.toLowerCase()})`, 'info'), 1600);
+      }
       setTimeout(() => go('maintenance'), 300);
     } catch (err) {
       toast(err.message || 'Failed to close job', 'error');
@@ -2056,6 +2100,16 @@ function openReportBreakdown(equipId) {
         <input class="input" id="bd-reporter" placeholder="Your name" autocomplete="off" value="${S.user ? S.user.name : ''}">
       </div>
       <div class="field">
+        <label class="field-label">Photo of the problem <span style="font-weight:400;color:var(--text-4)">(optional, recommended)</span></label>
+        <input type="file" id="bd-photo" accept="image/*" capture="environment" style="display:none;">
+        <div id="bd-photo-area">
+          <button type="button" class="btn" id="bd-photo-btn" style="width:100%;justify-content:center;padding:12px;border-style:dashed;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Take or upload photo
+          </button>
+        </div>
+      </div>
+      <div class="field">
         <label class="field-label">Immediate action taken <span style="font-weight:400;color:var(--text-4)">(optional)</span></label>
         <textarea class="input" id="bd-action" rows="2" placeholder="e.g. Equipment stopped and cordoned off. Supervisor notified."></textarea>
       </div>
@@ -2101,6 +2155,43 @@ function openReportBreakdown(equipId) {
   equipSel.addEventListener('change', renderDupWarn);
   renderDupWarn();   // run once for the preselected equipment
 
+  // Photo capture — opens camera on phone (capture="environment"), file picker on desktop.
+  let bdPhotoData = null;
+  const photoInput = document.getElementById('bd-photo');
+  const photoArea  = document.getElementById('bd-photo-area');
+  const renderPhotoPreview = () => {
+    if (!bdPhotoData) {
+      photoArea.innerHTML = `
+        <button type="button" class="btn" id="bd-photo-btn" style="width:100%;justify-content:center;padding:12px;border-style:dashed;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:16px;height:16px;"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Take or upload photo
+        </button>`;
+      document.getElementById('bd-photo-btn').onclick = () => photoInput.click();
+    } else {
+      photoArea.innerHTML = `
+        <div style="position:relative;border-radius:var(--r-md);overflow:hidden;border:0.5px solid var(--border-2);">
+          <img src="${bdPhotoData}" alt="breakdown" style="display:block;width:100%;max-height:240px;object-fit:cover;">
+          <button type="button" id="bd-photo-remove" title="Remove photo" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,0.6);color:white;border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>`;
+      document.getElementById('bd-photo-remove').onclick = () => { bdPhotoData = null; renderPhotoPreview(); };
+    }
+  };
+  document.getElementById('bd-photo-btn').onclick = () => photoInput.click();
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    try {
+      bdPhotoData = await compressImage(file, 1280, 0.82);
+      renderPhotoPreview();
+    } catch (e) {
+      toast('Could not load that image', 'error');
+    } finally {
+      photoInput.value = '';
+    }
+  });
+
   document.getElementById('bd-submit-btn').onclick = async () => {
     const equipId  = document.getElementById('bd-equip').value;
     const desc     = document.getElementById('bd-desc').value.trim();
@@ -2128,6 +2219,7 @@ function openReportBreakdown(equipId) {
       description: desc + (document.getElementById('bd-action').value.trim() ? '\n\nImmediate action: ' + document.getElementById('bd-action').value.trim() : ''),
       severity:   document.querySelector('input[name="bd-sev"]:checked').value,
       reportedBy: reporter,
+      photo:      bdPhotoData,
     });
   };
 }
@@ -2144,6 +2236,7 @@ async function saveBreakdown(data) {
       reportedBy:  data.reportedBy,
       description: data.description,
       severity:    data.severity,
+      photo:       data.photo || null,
     });
     // Server flips equipment.status to 'breakdown' as part of the transaction
     await Promise.all([refreshBreakdowns(), refreshEquipment()]);
@@ -2401,6 +2494,67 @@ function openDeleteBreakdown(bdId) {
   };
 }
 
+/* openUpdateHours — daily operating-hours update for an equipment.
+   Any logged-in user can submit; backend enforces non-decreasing values. */
+function openUpdateHours(equipId) {
+  const e = EQUIPMENT.find(x => x.id === equipId);
+  if (!e) { toast('Equipment not found', 'error'); return; }
+
+  document.getElementById('modal-box').style.maxWidth = '440px';
+  openModal('');
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="modal-hd">
+      <div>
+        <div class="modal-title">Update operating hours</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px;">${e.name} · <span class="code">${e.code}</span></div>
+      </div>
+      <button class="icon-btn" id="uh-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:var(--neutral-bg);border-radius:var(--r-md);padding:10px 12px;font-size:12px;">
+        <div class="flex-between"><span class="text-3">Current reading</span><span style="font-weight:600;">${e.hours.toLocaleString()} hrs</span></div>
+      </div>
+      <div class="field">
+        <label class="field-label">New reading (hrs) <span class="req">*</span></label>
+        <input class="input" type="number" id="uh-hours" min="${e.hours}" step="1" placeholder="${e.hours}" autocomplete="off" autofocus>
+        <div class="field-hint">Today's meter reading. Cannot be less than ${e.hours.toLocaleString()} hrs.</div>
+      </div>
+      <div class="field">
+        <label class="field-label">Recorded by</label>
+        <input class="input" id="uh-by" value="${S.user ? S.user.name : ''}" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" id="uh-cancel">Cancel</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-primary" id="uh-submit">Update hours</button>
+    </div>
+  `;
+  const close = () => { closeModal(); document.getElementById('modal-box').style.maxWidth = ''; };
+  document.getElementById('uh-close').onclick  = close;
+  document.getElementById('uh-cancel').onclick = close;
+  document.getElementById('uh-submit').onclick = async () => {
+    const input = document.getElementById('uh-hours');
+    const newHours = parseInt(input.value);
+    if (!Number.isFinite(newHours) || newHours < 0) { input.focus(); toast('Enter a valid hour reading', 'error'); return; }
+    if (newHours < e.hours) { input.focus(); toast(`Cannot go below ${e.hours.toLocaleString()} hrs`, 'error'); return; }
+    const btn = document.getElementById('uh-submit');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await API.updateEquipmentHours(equipId, newHours);
+      await Promise.all([refreshEquipment(), refreshJobs()]);
+      close();
+      toast(`${e.name} · now ${newHours.toLocaleString()} hrs`, 'success');
+      render();
+    } catch (err) {
+      toast(err.message || 'Failed to update hours', 'error');
+      btn.disabled = false; btn.textContent = 'Update hours';
+    }
+  };
+}
+
 function openLogFuel(equipId) {
   const preselect = equipId || '';
   document.getElementById('modal-box').style.maxWidth = '500px';
@@ -2527,7 +2681,7 @@ const AE_FUELS     = ['Diesel', 'Petrol', 'Electric', 'LPG'];
 const AE_MAKES     = ['Toyota', 'Komatsu', 'Nissan', 'Kobelco', 'Sunward', 'TCM', 'Mitsubishi', 'Hyster', 'Crown', 'Other'];
 
 function blankEquipData() {
-  return { name:'', code:'', type:'Forklift', location:'HQ', make:'', model:'', engine:'', fuel:'Diesel', capacity:'', purchase:'', hours:'', photos:{ front:null, rear:null, left:null, right:null } };
+  return { name:'', code:'', type:'Forklift', location:'HQ', make:'', model:'', engine:'', fuel:'Diesel', capacity:'', purchase:'', hours:'', tracksHours:true, photos:{ front:null, rear:null, left:null, right:null } };
 }
 
 function openAddEquipment() {
@@ -2619,9 +2773,30 @@ function renderAddEquipModal() {
           <input class="input ae-input" type="date" data-field="purchase" value="${d.purchase}">
         </div>
         <div class="field span-2">
-          <label class="field-label">Current operating hours <span class="req">*</span></label>
-          <input class="input ae-input" type="number" data-field="hours" value="${d.hours}" placeholder="e.g. 1250" min="0">
+          <label class="field-label">Maintenance scheduling <span class="req">*</span></label>
+          <div class="ae-basis-toggle">
+            <label class="ae-basis-opt ${d.tracksHours ? 'on' : ''}">
+              <input type="radio" name="ae-basis" value="hour" ${d.tracksHours ? 'checked' : ''}>
+              <div>
+                <div class="ae-basis-title">Operating hours</div>
+                <div class="ae-basis-sub">Service every N running hours</div>
+              </div>
+            </label>
+            <label class="ae-basis-opt ${!d.tracksHours ? 'on' : ''}">
+              <input type="radio" name="ae-basis" value="time" ${!d.tracksHours ? 'checked' : ''}>
+              <div>
+                <div class="ae-basis-title">Calendar time</div>
+                <div class="ae-basis-sub">Service weekly, monthly, yearly</div>
+              </div>
+            </label>
+          </div>
         </div>
+        ${d.tracksHours ? `
+          <div class="field span-2">
+            <label class="field-label">Current operating hours <span class="req">*</span></label>
+            <input class="input ae-input" type="number" data-field="hours" value="${d.hours}" placeholder="e.g. 1250" min="0">
+          </div>
+        ` : ''}
       </div>`;
 
   } else {
@@ -2657,7 +2832,8 @@ function renderAddEquipModal() {
           ['Fuel',         d.fuel],
           ['Capacity',     d.capacity || '—'],
           ['Purchase date',d.purchase ? fmtDate(d.purchase) : '—'],
-          ['Op. hours',    d.hours    ? d.hours + ' hrs' : '—'],
+          ['Scheduling',   d.tracksHours ? 'Operating hours' : 'Calendar time'],
+          ['Op. hours',    d.tracksHours ? (d.hours ? d.hours + ' hrs' : '—') : 'n/a'],
         ].map(([l, v]) => `
           <div class="ae-review-item">
             <div class="ae-review-label">${l}</div>
@@ -2708,6 +2884,16 @@ function bindAddEquipHandlers() {
       inp.addEventListener(ev, () => {
         S.addEquipData[inp.dataset.field] = inp.value;
       });
+    });
+  });
+
+  // Maintenance scheduling toggle (hour vs time) — re-renders to show/hide hours field
+  inner.querySelectorAll('input[name="ae-basis"]').forEach(r => {
+    r.addEventListener('change', () => {
+      collectAEInputs();
+      S.addEquipData.tracksHours = (r.value === 'hour');
+      if (!S.addEquipData.tracksHours) S.addEquipData.hours = '';
+      renderAddEquipModal();
     });
   });
 
@@ -2763,9 +2949,11 @@ function validateAEStep(step) {
   if (step === 2) {
     if (!d.make.trim())  return aeError('make',  'Make / Brand is required');
     if (!d.model.trim()) return aeError('model', 'Model is required');
-    if (!String(d.hours).trim()) return aeError('hours', 'Operating hours is required');
-    if (isNaN(parseInt(d.hours)) || parseInt(d.hours) < 0)
-      return aeError('hours', 'Enter a valid number (0 or more)');
+    if (d.tracksHours) {
+      if (!String(d.hours).trim()) return aeError('hours', 'Operating hours is required');
+      if (isNaN(parseInt(d.hours)) || parseInt(d.hours) < 0)
+        return aeError('hours', 'Enter a valid number (0 or more)');
+    }
   }
   return true;
 }
@@ -2806,7 +2994,8 @@ async function saveNewEquipment() {
     capacity: d.capacity.trim() || '—',
     engine:   d.engine.trim()   || '—',
     purchase: d.purchase || null,
-    hours:    parseInt(d.hours) || 0,
+    hours:        d.tracksHours ? (parseInt(d.hours) || 0) : 0,
+    tracksHours:  !!d.tracksHours,
     status:   'ok',
     photos:   { front: d.photos.front, rear: d.photos.rear, left: d.photos.left, right: d.photos.right },
   };
@@ -2994,9 +3183,12 @@ function attachHandlers() {
         go('schedule');
       } else if (act === 'schedule-for-equipment') {
         const equipId = el.dataset.equip || S.selectedEquipment;
+        const eq = EQUIPMENT.find(x => x.id === equipId);
         S.scheduleForm = freshScheduleForm();
         S.scheduleForm.entityType = 'equipment';
         S.scheduleForm.equipId    = equipId;
+        // Basis is owned by the equipment record, not chosen per-job.
+        S.scheduleForm.basis      = (eq && eq.tracksHours) ? 'hour' : 'time';
         S.scheduleForm.checklistId = suggestChecklistFor(equipId, S.scheduleForm.type, 'equipment');
         S.scheduleForm.requiredPartIds = defaultRequiredPartsFor(equipId, S.scheduleForm.type);
         go('schedule');
@@ -3031,6 +3223,8 @@ function attachHandlers() {
         openDeleteBreakdown(el.dataset.bd);
       } else if (act === 'log-fuel') {
         openLogFuel(el.dataset.equip || '');
+      } else if (act === 'update-hours') {
+        openUpdateHours(el.dataset.equip || S.selectedEquipment);
       } else if (act === 'view-photo') {
         openPhotoLightbox(el.dataset.src, el.dataset.label);
       } else if (act === 'add-equip-part') {
@@ -3066,6 +3260,16 @@ function attachHandlers() {
         const entId = isFac ? sf.facilityId : sf.equipId;
         sf.requiredPartIds = isFac ? [] : defaultRequiredPartsFor(entId, sf.type);
         sf.checklistId     = suggestChecklistFor(entId, sf.type, sf.entityType);
+      }
+      // Equipment selection overrides basis — basis is owned by the equipment, not the job.
+      if (field === 'equipId') {
+        const eq = EQUIPMENT.find(x => x.id === sf.equipId);
+        const newBasis = (eq && eq.tracksHours) ? 'hour' : 'time';
+        if (sf.basis !== newBasis) {
+          sf.basis = newBasis;
+          if (newBasis === 'time') sf.dueHours = '';
+          else sf.dueDate = '';
+        }
       }
       if (field === 'basis') {
         if (el.value === 'time') S.scheduleForm.dueHours = '';
@@ -3135,6 +3339,17 @@ function attachHandlers() {
       render();
     });
   });
+
+  // Maintenance secondary filters + sort dropdown
+  if (!S.maintFilters) S.maintFilters = { location: 'all', type: 'all', basis: 'all' };
+  const mLoc   = document.getElementById('maint-filter-location');
+  if (mLoc)   mLoc.addEventListener('change',   e => { S.maintFilters.location = e.target.value; render(); });
+  const mType  = document.getElementById('maint-filter-type');
+  if (mType)  mType.addEventListener('change',  e => { S.maintFilters.type = e.target.value; render(); });
+  const mBasis = document.getElementById('maint-filter-basis');
+  if (mBasis) mBasis.addEventListener('change', e => { S.maintFilters.basis = e.target.value; render(); });
+  const mSort  = document.getElementById('maint-sort');
+  if (mSort)  mSort.addEventListener('change',  e => { S.maintSort = e.target.value; render(); });
 
   // Equipment search & filters
   bindSearchInput('equip-search', 'equipSearch');
@@ -3294,6 +3509,8 @@ async function saveScheduleFromForm() {
     estCost:       parseInt(sf.estCost) || 0,
     requiredPartIds: isFac ? [] : [...sf.requiredPartIds],
     notes:         sf.notes,
+    recurrence:    basis === 'time' ? (sf.recurrence || 'none') : 'none',
+    recurrenceHours: basis === 'hour' ? (Number(sf.recurrenceHours) || 0) : null,
   };
   // On create only — set initial status/priority/started. On edit, preserve those.
   if (!isEdit) {
@@ -3379,6 +3596,8 @@ function openEditJob(jobId) {
     checklistId: j.checklistId || '',
     notes:       j.notes || '',
     requiredPartIds: Array.isArray(j.requiredPartIds) ? [...j.requiredPartIds] : [],
+    recurrence:      j.recurrence || 'none',
+    recurrenceHours: j.recurrenceHours || 0,
   };
   go('schedule');
 }
@@ -3441,6 +3660,11 @@ async function handleLogin(email, password) {
   if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
   try {
     const { user } = await API.login(email, password);
+    // Route by role: this is the admin app — operators go to the operator app
+    if (user.role !== 'admin') {
+      window.location.href = 'operator/';
+      return;
+    }
     S.loggedIn = true;
     S.user     = user;
     S.role     = user.role;
@@ -3477,6 +3701,11 @@ async function restoreSession() {
   try {
     const { user } = await API.me();
     if (user) {
+      // Route by role: this is the admin app — operators belong in /operator/
+      if (user.role !== 'admin') {
+        window.location.href = 'operator/';
+        return;
+      }
       S.loggedIn = true;
       S.user     = user;
       S.role     = user.role;
