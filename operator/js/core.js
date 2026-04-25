@@ -72,6 +72,7 @@ function render() {
   attachHandlers();
   updateNotificationBadge();
   updateNavCounts();
+  animateKpiCounters();
   // Close notification panel whenever a fresh render happens (page nav, data change)
   const panel = document.getElementById('notif-panel');
   if (panel && S.notifOpen === false) panel.style.display = 'none';
@@ -510,6 +511,9 @@ function renderNotificationPanel() {
   `;
 }
 
+// Sentinel: -1 = not yet initialized. We don't want to pulse on first load.
+let _lastNotifCount = -1;
+
 function updateNotificationBadge() {
   const count = S.loggedIn ? buildNotifications().length : 0;
   const dot = document.getElementById('notif-dot');
@@ -520,10 +524,26 @@ function updateNotificationBadge() {
   } else {
     dot.style.display = 'none';
   }
+  if (_lastNotifCount >= 0 && count > _lastNotifCount) {
+    const bellSvg = document.querySelector('.notif-btn svg');
+    if (bellSvg) {
+      bellSvg.classList.remove('bell-shaking');
+      void bellSvg.offsetWidth;
+      bellSvg.classList.add('bell-shaking');
+      setTimeout(() => bellSvg.classList.remove('bell-shaking'), 750);
+    }
+    if (dot) {
+      dot.classList.remove('badge-pulsing');
+      void dot.offsetWidth;
+      dot.classList.add('badge-pulsing');
+      setTimeout(() => dot.classList.remove('badge-pulsing'), 650);
+    }
+  }
+  _lastNotifCount = count;
 }
 
-/* Keep the sidebar nav badges in sync with live data.
-   Equipment = total count; Maintenance = items needing attention (overdue + active breakdowns). */
+/* Keep the sidebar Maintenance badge in sync with live data.
+   Maintenance = items needing attention (overdue jobs + active breakdowns). */
 
 function updateNavCounts() {
   const setBadge = (id, n) => {
@@ -533,13 +553,11 @@ function updateNavCounts() {
     else       { el.style.display = 'none'; }
   };
   if (!S.loggedIn) {
-    setBadge('nav-count-equipment', 0);
     setBadge('nav-count-maintenance', 0);
     return;
   }
-  setBadge('nav-count-equipment', EQUIPMENT.length);
-  const overdue    = JOBS.filter(j => effectiveStatus(j) === 'overdue').length;
-  const activeBd   = BREAKDOWNS.filter(b => b.status === 'active').length;
+  const overdue  = JOBS.filter(j => effectiveStatus(j) === 'overdue').length;
+  const activeBd = BREAKDOWNS.filter(b => b.status === 'active').length;
   setBadge('nav-count-maintenance', overdue + activeBd);
 }
 
@@ -742,6 +760,49 @@ function showWelcomeSplash(displayName) {
   };
   splash.addEventListener('click', close);
   setTimeout(close, 3500);
+}
+
+/* fireConfetti — celebration burst when a maintenance job is completed. */
+const _CONFETTI_COLORS = ['#185fa5', '#0f6e56', '#e8a92b', '#a32d2d', '#7038c7', '#d97706'];
+function fireConfetti(originX, originY) {
+  if (originX == null) originX = window.innerWidth / 2;
+  if (originY == null) originY = window.innerHeight / 2;
+  for (let i = 0; i < 50; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = originX + 'px';
+    piece.style.top  = originY + 'px';
+    piece.style.background = _CONFETTI_COLORS[i % _CONFETTI_COLORS.length];
+    const angle = (Math.random() * Math.PI) - (Math.PI * 1.2);
+    const speed = 200 + Math.random() * 250;
+    const dx = Math.cos(angle) * speed;
+    const dy = Math.sin(angle) * speed + 380;
+    piece.style.setProperty('--dx',  dx + 'px');
+    piece.style.setProperty('--dy',  dy + 'px');
+    piece.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+    document.body.appendChild(piece);
+    setTimeout(() => piece.remove(), 1700);
+  }
+}
+
+/* animateKpiCounters — count up numbers with class .kpi-counter from 0 to data-target. */
+function animateKpiCounters() {
+  document.querySelectorAll('.kpi-counter').forEach(el => {
+    const target = parseInt(el.dataset.target, 10);
+    if (!Number.isFinite(target)) return;
+    if (el._animatedTo === target) return;
+    el._animatedTo = target;
+    const startTime = performance.now();
+    const duration  = 1200;
+    el.textContent = '0';
+    function step(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(target * eased);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
 }
 
 /* compressImage — resize + re-encode an image File to a data URL.
