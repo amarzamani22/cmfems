@@ -1034,6 +1034,45 @@ tbody tr.clickable { cursor: pointer; }
 .empty-state-zero .empty-state-cta   { margin-top: 8px; }
 
 /* ════════════════════════════════════════════════
+   CONFETTI BURST — fired when a job is closed successfully.
+   ════════════════════════════════════════════════ */
+.confetti-piece {
+  position: fixed;
+  width: 9px; height: 14px;
+  pointer-events: none;
+  z-index: 9999;
+  border-radius: 2px;
+  animation: confettiFly 1.6s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+}
+@keyframes confettiFly {
+  0%   { transform: translate(0, 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; }
+}
+
+/* ════════════════════════════════════════════════
+   NOTIFICATION BELL — shake + pulse when a NEW alert arrives.
+   ════════════════════════════════════════════════ */
+.notif-btn svg.bell-shaking {
+  animation: bellShake 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  transform-origin: top center;
+}
+@keyframes bellShake {
+  0%, 100% { transform: rotate(0); }
+  15%      { transform: rotate(-18deg); }
+  30%      { transform: rotate(15deg);  }
+  45%      { transform: rotate(-12deg); }
+  60%      { transform: rotate(8deg);   }
+  75%      { transform: rotate(-4deg);  }
+}
+.notif-dot.badge-pulsing {
+  animation: badgePulse 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.5); }
+}
+
+/* ════════════════════════════════════════════════
    WELCOME SPLASH — shown once after a fresh login.
    ════════════════════════════════════════════════ */
 .welcome-splash {
