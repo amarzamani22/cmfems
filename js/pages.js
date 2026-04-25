@@ -4,6 +4,23 @@
 
 'use strict';
 
+/* renderSortBar — pill-style sort buttons with direction toggle. */
+function renderSortBar(options, activeKey, dir, dataAttr) {
+  const upArrow   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>';
+  const downArrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  const dualArrow = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="6 10 12 4 18 10"/><polyline points="6 14 12 20 18 14"/></svg>';
+  return `
+    <div class="sort-bar">
+      <span class="sort-bar-label">Sort by</span>
+      ${options.map(o => {
+        const active = activeKey === o.key;
+        const arrow  = active ? (dir === 'desc' ? downArrow : upArrow) : dualArrow;
+        return `<button type="button" class="sort-btn ${active ? 'active' : ''}" ${dataAttr}="${o.key}">${o.label} ${arrow}</button>`;
+      }).join('')}
+    </div>
+  `;
+}
+
 /* ═══════════════════════════════════════════════════════════
    LOGIN SCREEN
    ═══════════════════════════════════════════════════════════ */
@@ -709,12 +726,22 @@ function renderEquipCard(e) {
             </div>
           `}
         </div>
-        <button class="btn btn-sm bd-report-btn" style="color:var(--bd-text);border-color:var(--bd-border);background:var(--bd-bg);align-self:flex-end;"
-          data-action="report-breakdown" data-equip="${e.id}"
-          onclick="event.stopPropagation()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          Report breakdown
-        </button>
+        <div class="equip-card-actions">
+          ${e.tracksHours ? `
+            <button class="btn btn-sm" style="color:var(--info-text);border-color:var(--info-text);background:var(--info-bg);"
+              data-action="update-hours" data-equip="${e.id}"
+              onclick="event.stopPropagation()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Update hours
+            </button>
+          ` : ''}
+          <button class="btn btn-sm bd-report-btn" style="color:var(--bd-text);border-color:var(--bd-border);background:var(--bd-bg);"
+            data-action="report-breakdown" data-equip="${e.id}"
+            onclick="event.stopPropagation()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            Report breakdown
+          </button>
+        </div>
       </div>
     </div>
   `;
@@ -1106,12 +1133,15 @@ function renderMaintenance() {
     if (j.basis === 'hour' && j.dueHours != null) return Number.MAX_SAFE_INTEGER - (j.dueHours - (j.currentHours||0));
     return Number.MAX_SAFE_INTEGER;
   };
-  const sortKey = S.maintSort || 'due';
+  const sortKey  = S.maintSort || 'due';
+  const sortSign = (S.maintSortDir === 'desc') ? -1 : 1;
   filtered = [...filtered].sort((a, b) => {
-    if (sortKey === 'priority')  return (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
-    if (sortKey === 'type')      return (a.type || '').localeCompare(b.type || '');
-    if (sortKey === 'equipment') return (a.equipName || '').localeCompare(b.equipName || '');
-    return dueScore(a) - dueScore(b);
+    let cmp;
+    if      (sortKey === 'priority')  cmp = (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9);
+    else if (sortKey === 'type')      cmp = (a.type || '').localeCompare(b.type || '');
+    else if (sortKey === 'equipment') cmp = (a.equipName || '').localeCompare(b.equipName || '');
+    else                              cmp = dueScore(a) - dueScore(b);
+    return cmp * sortSign;
   });
 
   const isCal = S.maintView === 'calendar';
@@ -1173,12 +1203,20 @@ function renderMaintenance() {
             <option value="time" ${mf.basis==='time'?'selected':''}>Time-based</option>
             <option value="hour" ${mf.basis==='hour'?'selected':''}>Hour-based</option>
           </select>
-          <select class="filter-select" id="maint-sort" title="Sort">
-            <option value="due"       ${(S.maintSort||'due')==='due'       ?'selected':''}>Sort: Due (earliest)</option>
-            <option value="priority"  ${S.maintSort==='priority' ?'selected':''}>Sort: Priority</option>
-            <option value="type"      ${S.maintSort==='type'     ?'selected':''}>Sort: Service type</option>
-            <option value="equipment" ${S.maintSort==='equipment'?'selected':''}>Sort: Equipment name</option>
-          </select>
+        </div>
+
+        <div class="mb-16">
+          ${renderSortBar(
+            [
+              { key: 'due',       label: 'Due'           },
+              { key: 'priority',  label: 'Priority'      },
+              { key: 'type',      label: 'Service type'  },
+              { key: 'equipment', label: 'Equipment'     },
+            ],
+            S.maintSort || 'due',
+            S.maintSortDir || 'asc',
+            'data-sort-maint'
+          )}
         </div>
 
         ${filtered.length === 0 ? `
@@ -1326,6 +1364,8 @@ function renderJob() {
               </div>
             `).join('')}
           </div>
+
+          ${isStarted ? renderProofPhotosCard() : ''}
         </div>
 
         <div>
@@ -1410,6 +1450,43 @@ function renderJob() {
           `) : ''}
         </div>
       </div>
+    </div>
+  `;
+}
+
+/* Proof photos card — sits below the checklist on the active job page.
+   Shown only after the job is started. Up to 6 photos travel with the close
+   payload and are persisted on the history record (history.proof_photos). */
+function renderProofPhotosCard() {
+  const photos = S.proofPhotos || [];
+  const MAX = 6;
+  return `
+    <div class="card mb-12">
+      <div class="section-hd mb-8">
+        <div class="section-hd-title">Proof photos <span style="font-weight:400;color:var(--text-3);font-size:11px;">(optional · evidence of work)</span></div>
+        <span style="font-size:11px;color:var(--text-3);">${photos.length} / ${MAX}</span>
+      </div>
+      ${photos.length > 0 ? `
+        <div class="proof-grid">
+          ${photos.map((p, idx) => `
+            <div class="proof-thumb">
+              <img src="${p}" alt="Proof ${idx + 1}" data-action="view-photo" data-src="${p}" data-label="Proof photo ${idx + 1}">
+              <button class="proof-rm" data-action="remove-proof-photo" data-idx="${idx}" title="Remove">×</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : `
+        <div style="font-size:12px;color:var(--text-3);padding:6px 0 10px;">No photos yet — add photos as you work to keep an evidence trail.</div>
+      `}
+      ${photos.length < MAX ? `
+        <label class="btn proof-add-btn" for="proof-input">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:14px;height:14px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Add photo
+        </label>
+        <input id="proof-input" type="file" accept="image/*" capture="environment" style="display:none;">
+      ` : `
+        <div style="font-size:11px;color:var(--text-3);text-align:center;padding:6px 0;">Maximum ${MAX} photos reached.</div>
+      `}
     </div>
   `;
 }
@@ -1791,11 +1868,12 @@ function renderHistMaintenance(list) {
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Date</th><th>Asset</th><th>Service</th><th>Duration</th><th>Parts</th><th>Cost</th><th>Technician</th></tr>
+          <tr><th>Date</th><th>Asset</th><th>Service</th><th>Duration</th><th>Parts</th><th>Cost</th><th>Technician</th><th>Photos</th></tr>
         </thead>
         <tbody>
           ${list.map(h => {
             const isFac = h.entityType === 'facility';
+            const photos = Array.isArray(h.proofPhotos) ? h.proofPhotos : [];
             return `
               <tr>
                 <td style="white-space:nowrap;color:var(--text-2);">${fmtDate(h.date)}</td>
@@ -1816,6 +1894,14 @@ function renderHistMaintenance(list) {
                   ${(h.partsCost || h.laborCost || h.miscCost) ? `<div style="font-size:10px;color:var(--text-3);font-weight:400;margin-top:2px;">P ${fmtRM(h.partsCost||0)} · L ${fmtRM(h.laborCost||0)}${h.miscCost ? ' · M ' + fmtRM(h.miscCost) : ''}</div>` : ''}
                 </td>
                 <td style="color:var(--text-2);">${h.tech || '—'}</td>
+                <td style="text-align:center;">
+                  ${photos.length > 0
+                    ? `<button class="btn btn-sm" data-action="view-proof-photos" data-history="${h.id}" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--info-text);border-color:var(--info-text);">
+                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="width:11px;height:11px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                         ${photos.length}
+                       </button>`
+                    : `<span style="color:var(--text-4);font-size:11px;">—</span>`}
+                </td>
               </tr>
             `;
           }).join('')}
